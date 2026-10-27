@@ -11,7 +11,7 @@
 <style>
 /* Layout: ops console. Topology canvas on the left, inspector + config rail on the right, tabbed tmsh-style console underneath. */
 :root{
-  --bg:#e8ecf0; --panel:#fbfcfd; --sunk:#f0f3f6; --zone:#dfe6ec; --inet:#e9e4f3;
+  --bg:#e8ecf0; --panel:#fbfcfd; --sunk:#f0f3f6; --zone:#dfe6ec; --inet:#e9e4f3; --corp:#e2eee6; --dmz:#f1ebdf;
   --ink:#15212c; --muted:#56656f; --line:#cbd4dc; --wire:#9eacb8;
   --accent:#2450c9; --accent-ink:#ffffff;
   --iq:#2450c9; --probe:#c27400; --result:#08857a; --path:#7b47d1; --dns:#c22d6a;
@@ -21,7 +21,7 @@
   --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b;
+  --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b; --corp:#16241c; --dmz:#25211a;
   --ink:#e2e9ef; --muted:#93a3b1; --line:#2a3743; --wire:#4c5c6a;
   --accent:#6f95ff; --accent-ink:#0b1220;
   --iq:#6f95ff; --probe:#f0a52a; --result:#2fc4b0; --path:#ad86ff; --dns:#ff6aa4;
@@ -29,7 +29,7 @@
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
-  --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b;
+  --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b; --corp:#16241c; --dmz:#25211a;
   --ink:#e2e9ef; --muted:#93a3b1; --line:#2a3743; --wire:#4c5c6a;
   --accent:#6f95ff; --accent-ink:#0b1220;
   --iq:#6f95ff; --probe:#f0a52a; --result:#2fc4b0; --path:#ad86ff; --dns:#ff6aa4;
@@ -84,12 +84,14 @@ svg#topo{display:block;width:100%;height:auto}
 .hint-pop.below::before{top:-8px;border-right:0;border-bottom:0}
 .hint-pop.above::before{bottom:-8px;border-left:0;border-top:0}
 .hint-pop.sheet{position:fixed;left:12px;right:12px;bottom:12px;top:auto!important;width:auto;max-height:55vh;overflow:auto;z-index:20}
-.hint-pop.sheet::before{display:none}
+.hint-pop.sheet::before,.hint-pop:not(.above):not(.below)::before{display:none}
 .hint{padding:8px 14px 12px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line)}
 
 /* topology */
 .zone{fill:var(--zone)}
 .zone-inet{fill:var(--inet)}
+.zone-corp{fill:var(--corp)}
+.zone-dmz{fill:var(--dmz)}
 .zlabel{font-family:var(--f-disp);font-stretch:80%;font-weight:700;font-size:15px;fill:var(--ink)}
 .zsub{font-family:var(--f-mono);font-size:10.5px;fill:var(--muted)}
 .nb{fill:var(--panel);stroke:var(--wire);stroke-width:1.2}
@@ -191,7 +193,7 @@ code{font-family:var(--f-mono);font-size:12px}
   <header class="top">
     <div class="brand">
       <h1>BIG-IP DNS Traffic Lab</h1>
-      <p>GSLB with F5 BIG-IP DNS for chala.info: BIND is authoritative for the zone and delegates gtm.chala.info to two BIG-IP DNS devices in two data centers. Follow a lookup from the client to BIND to gtmd, and watch how the bigip monitor, custom monitors and a generic host feed gtmd the status it answers from.</p>
+      <p>Split-horizon GSLB with F5 BIG-IP DNS for chala.info: BIND is authoritative for the zone and delegates gtm.chala.info to two BIG-IP DNS devices in two data centers. Office clients get internal addresses and internet clients get public ones. Follow a lookup hop by hop, and watch how the bigip monitor, custom monitors and generic hosts feed gtmd the status it answers from.</p>
     </div>
     <div class="transport">
       <span class="clock" id="clock">Oct 27 14:02:00</span>
@@ -242,6 +244,14 @@ code{font-family:var(--f-mono);font-size:12px}
 
   <section class="notes">
     <div class="card">
+      <h4>Split DNS</h4>
+      <ul>
+        <li>BIND has two views. Resolvers in <code>10.0.0.0/8</code> get the <code>internal</code> view, everyone else <code>external</code>. Both CNAME the apps into gtm.chala.info, but the delegation points to the listeners' internal or public (NATed) addresses.</li>
+        <li>On BIG-IP DNS each wide IP has two pools. The wide IP uses Topology: an LDNS in region <code>internal_nets</code> scores pool <code>_int</code> (10.x answers), any other LDNS scores pool <code>_ext</code> (public answers).</li>
+        <li>External virtual server objects use a translation address, so gtmd answers the public address while big3d still monitors the private one.</li>
+      </ul>
+    </div>
+    <div class="card">
       <h4>Delegating to BIG-IP DNS</h4>
       <ul>
         <li>BIND stays authoritative for <code>chala.info</code>. Each app name is a CNAME: <code>app1.chala.info → app1.gtm.chala.info</code>.</li>
@@ -275,7 +285,7 @@ code{font-family:var(--f-mono);font-size:12px}
     </div>
     <div class="card">
       <h4>About this model</h4>
-      <p>1× is real time and uses BIG-IP defaults: iQuery heartbeat 10 s, bigip monitor 30 s / 90 s, custom monitors 30 s / 120 s, path TTL 2400 s, pool TTL 30 s. Use 5× to 20× to skip ahead. Packets in flight are slowed down so you can see them; real iQuery and DNS messages take milliseconds. The LDNS is assumed to already know where chala.info lives, so root and .info lookups are skipped. Log lines, iQuery XML and the config tabs are modeled on real output but simplified, so check a real device for exact text. Real CLI to try: <code>tmsh show gtm iquery</code>, <code>tmsh show gtm pool a</code>, <code>dig app1.chala.info +trace</code>, <code>iqdump 10.1.10.10</code>.</p>
+      <p>1× is real time and uses BIG-IP defaults: iQuery heartbeat 10 s, bigip monitor 30 s / 90 s, custom monitors 30 s / 120 s, path TTL 2400 s, pool TTL 30 s. Use 5× to 20× to skip ahead. Packets in flight are slowed down so you can see them; real iQuery and DNS messages take milliseconds. The LDNS is assumed to already know where chala.info lives, so root and .info lookups are skipped. Internal and external virtual server objects share one status per real server here; on a real system each is monitored separately. Log lines, iQuery XML and the config tabs are modeled on real output but simplified, so check a real device for exact text. Real CLI to try: <code>tmsh show gtm iquery</code>, <code>tmsh show gtm pool a</code>, <code>dig app1.chala.info +trace</code>, <code>iqdump 10.1.10.10</code>.</p>
     </div>
   </section>
 </div>
@@ -317,6 +327,14 @@ const MTYPES = { http: "HTTP", https: "HTTPS", tcp: "TCP", gateway_icmp: "Gatewa
 const SEND_DEF = (host, path = "/health") => `GET ${path} HTTP/1.1\\r\\nHost: ${host}\\r\\nConnection: Close\\r\\n\\r\\n`;
 const draftFor = type => ({ name: "", type, send: type === "http" || type === "https" ? SEND_DEF("app2.chala.info") : "", recv: type === "http" || type === "https" ? "200 OK" : "", interval: 30, timeout: 120 });
 const fqdn = wk => `${wk}.chala.info`;
+const INTERNAL_NET = "10.0.0.0/8";
+/* split DNS: resolvers in 10/8 get BIND's internal view and gtmd's _int pools */
+const isInt = ldns => !!N[ldns].internal;
+const viewOf = ldns => isInt(ldns) ? "internal" : "external";
+const poolFor = (W, ldns) => `${W.pool}_${isInt(ldns) ? "int" : "ext"}`;
+const addrFor = (m, ldns) => isInt(ldns) ? m.ip : m.pub;
+const lsnr = (g, ldns) => isInt(ldns) ? N[g].listener : N[g].pub;
+const ldnsName = id => `LDNS ${id.slice(-1).toUpperCase()} (${N[id].internal ? "internal" : "ISP"})`;
 
 let S = { speed: 1, playing: false, started: false, viewGtm: "gtm-nyc", sel: { k: "node", id: "client-a" }, tab: "log", show: { iq: true, result: true, probe: true, path: true, dns: true }, iqd: "gtm-sea>ltm-nyc", dnsOn: true, scen: "dns", draft: draftFor("http"), err: "" };
 let N, DC, POOLS, WIPS, MONS, INST, CONN, VIEW, PATHS, PENDING, CACHE, TIMERS, LOGS, DNSLOG, PK, FL, RR, HINT = null;
@@ -325,21 +343,21 @@ let N, DC, POOLS, WIPS, MONS, INST, CONN, VIEW, PATHS, PENDING, CACHE, TIMERS, L
 function fresh() {
   N = {
     "ltm-nyc": { id: "ltm-nyc", kind: "bigip", dns: false, dc: "nyc", ip: "10.1.10.10", x: 130, y: 250, up: true, big3d: true, model: "BIG-IP LTM", pref: "inherit", fb: "inherit", nextBig: 4 },
-    "gtm-nyc": { id: "gtm-nyc", kind: "bigip", dns: true, dc: "nyc", ip: "10.1.10.5", listener: "10.1.10.53", x: 360, y: 250, up: true, big3d: true, model: "BIG-IP DNS" },
-    "gtm-sea": { id: "gtm-sea", kind: "bigip", dns: true, dc: "sea", ip: "10.2.10.5", listener: "10.2.10.53", x: 640, y: 250, up: true, big3d: true, model: "BIG-IP DNS" },
+    "gtm-nyc": { id: "gtm-nyc", kind: "bigip", dns: true, dc: "nyc", ip: "10.1.10.5", listener: "10.1.10.53", pub: "203.0.113.53", x: 360, y: 250, up: true, big3d: true, model: "BIG-IP DNS" },
+    "gtm-sea": { id: "gtm-sea", kind: "bigip", dns: true, dc: "sea", ip: "10.2.10.5", listener: "10.2.10.53", pub: "203.0.113.153", x: 640, y: 250, up: true, big3d: true, model: "BIG-IP DNS" },
     "ltm-sea": { id: "ltm-sea", kind: "bigip", dns: false, dc: "sea", ip: "10.2.10.10", x: 870, y: 250, up: true, big3d: true, model: "BIG-IP LTM", pref: "inherit", fb: "inherit", nextBig: 5.5 },
-    "ldns-a": { id: "ldns-a", kind: "ldns", ip: "198.51.100.53", x: 300, y: 80, rtt: { nyc: 21, sea: 74 }, client: "client-a" },
-    "bind": { id: "bind", kind: "bind", ip: "192.0.2.53", x: 500, y: 80, up: true },
-    "ldns-b": { id: "ldns-b", kind: "ldns", ip: "203.0.113.53", x: 700, y: 80, rtt: { nyc: 69, sea: 17 }, client: "client-b" },
-    "client-a": { id: "client-a", kind: "client", ip: "198.51.100.77", x: 95, y: 80 },
-    "client-b": { id: "client-b", kind: "client", ip: "203.0.113.140", x: 905, y: 80 },
-    "gen-nyc-01": { id: "gen-nyc-01", kind: "generic", server: "gen-nyc-01", vsName: "app4_web", dc: "nyc", wip: "app4", ip: "10.1.30.11", port: 80, x: 360, y: 430, up: true, vsUp: true, appOk: true, pref: "pool:pp_east", fb: "inherit" },
-    "gen-sea-01": { id: "gen-sea-01", kind: "generic", server: "gen-sea-01", vsName: "app4_web", dc: "sea", wip: "app4", ip: "10.2.30.11", port: 80, x: 640, y: 430, up: true, vsUp: true, appOk: true, pref: "pool:pp_west", fb: "inherit" },
+    "ldns-a": { id: "ldns-a", kind: "ldns", internal: true, ip: "10.0.0.53", x: 300, y: 90, rtt: { nyc: 4, sea: 66 }, client: "client-a" },
+    "bind": { id: "bind", kind: "bind", ip: "192.0.2.53", x: 500, y: 90, up: true },
+    "ldns-b": { id: "ldns-b", kind: "ldns", internal: false, ip: "198.51.100.53", x: 760, y: 90, rtt: { nyc: 69, sea: 17 }, client: "client-b" },
+    "client-a": { id: "client-a", kind: "client", ip: "10.0.5.77", x: 95, y: 90 },
+    "client-b": { id: "client-b", kind: "client", ip: "198.51.100.140", x: 920, y: 90 },
+    "gen-nyc-01": { id: "gen-nyc-01", kind: "generic", server: "gen-nyc-01", vsName: "app4_web", dc: "nyc", wip: "app4", ip: "10.1.30.11", pub: "203.0.113.40", port: 80, x: 360, y: 430, up: true, vsUp: true, appOk: true, pref: "pool:pp_east", fb: "inherit" },
+    "gen-sea-01": { id: "gen-sea-01", kind: "generic", server: "gen-sea-01", vsName: "app4_web", dc: "sea", wip: "app4", ip: "10.2.30.11", pub: "203.0.113.140", port: 80, x: 640, y: 430, up: true, vsUp: true, appOk: true, pref: "pool:pp_west", fb: "inherit" },
   };
   LTM_APPS.forEach((w, i) => {
     for (const dc of ["nyc", "sea"]) {
       const ltm = "ltm-" + dc, id = `vs_${w}_${dc}`;
-      N[id] = { id, kind: "vs", server: ltm, vsName: id, dc, wip: w, ip: `10.${dc === "nyc" ? 1 : 2}.20.${(i + 1) * 10}`, port: 443, x: N[ltm].x, y: 345 + i * 55, vsUp: true, appOk: true };
+      N[id] = { id, kind: "vs", server: ltm, vsName: id, dc, wip: w, ip: `10.${dc === "nyc" ? 1 : 2}.20.${(i + 1) * 10}`, pub: `203.0.113.${(dc === "nyc" ? 0 : 100) + (i + 1) * 10}`, port: 443, x: N[ltm].x, y: 345 + i * 55, vsUp: true, appOk: true };
     }
   });
   DC = { nyc: { name: "dc_nyc", city: "New York", pref: "inside", fb: "any" }, sea: { name: "dc_sea", city: "Seattle", pref: "inside", fb: "any" } };
@@ -675,13 +693,13 @@ function decide(g, ldns, wk) {
   return { m: avail[(W.rr[g]++) % avail.length], method: "Round Robin", why: `${avail.length} available member${avail.length > 1 ? "s" : ""}, taking turns` };
 }
 const pickListener = () => GTMS[Math.random() < 0.5 ? 0 : 1];
-function dnsQuery(ldns, wk, guide) {
+function dnsQuery(ldns, wk, guide, after) {
   ldns = ldns || LDNS[Math.random() < 0.5 ? 0 : 1];
   wk = wk || WKEYS[Math.floor(Math.random() * WKEYS.length)];
   if (guide && S.guiding) guide = false;
   if (guide) S.guiding = true;
-  const L = N[ldns], q = { ldns, wk, guide, n: 0, path: [] };
-  guideStep(q, L.client, `The client (${N[L.client].ip}) looks up <b>${fqdn(wk)}</b>. Its stub resolver sends the query to its local DNS server, LDNS ${L.ip}.`, () =>
+  const L = N[ldns], q = { ldns, wk, guide, after: guide ? after : null, n: 0, path: [] };
+  guideStep(q, L.client, `${L.internal ? "An office client" : "A client on the internet"} (${N[L.client].ip}) looks up <b>${fqdn(wk)}</b>. Its stub resolver sends the query to ${L.internal ? "the company's internal resolver" : "its ISP's resolver"}, ${ldnsName(ldns)} at ${L.ip}.`, () =>
     spawn(L.client, ldns, "dns", { label: `${fqdn(wk)} A?`, onArrive: () => ldnsResolve(q) }));
 }
 function ldnsResolve(q) {
@@ -695,26 +713,26 @@ function ldnsResolve(q) {
   if (C.cname[wk] > S.now && C.ns > S.now) {
     const g = pickListener();
     q.path.push("cached CNAME");
-    guideStep(q, q.ldns, `LDNS still has the CNAME (${fqdn(wk)} → ${WIPS[wk].name}) and the gtm.chala.info delegation cached, but no valid A record. It skips BIND and asks a BIG-IP DNS listener, ${g} (${N[g].listener}).`, () => askGtm(q, g, 0));
+    guideStep(q, q.ldns, `LDNS still has the CNAME (${fqdn(wk)} → ${WIPS[wk].name}) and the gtm.chala.info delegation cached, but no valid A record. It skips BIND and asks a BIG-IP DNS listener, ${g} (${lsnr(g, q.ldns)}).`, () => askGtm(q, g, 0));
     return;
   }
   guideStep(q, q.ldns, `LDNS has nothing cached for ${fqdn(wk)}. It sends the query to BIND (ns1.chala.info, ${N.bind.ip}), the authoritative server for chala.info.`, () => askBind(q));
 }
 function askBind(q) {
-  const wk = q.wk;
-  q.path.push("BIND");
+  const wk = q.wk, view = viewOf(q.ldns), int = isInt(q.ldns);
+  q.path.push(`BIND (${view})`);
   spawn(q.ldns, "bind", "dns", { label: `${fqdn(wk)} A?`, onArrive: () => {
     if (!N.bind.up) { flash(N.bind.x, N.bind.y, "r"); fail(q, "SERVFAIL", "BIND (named) is not answering, so the LDNS can't learn the CNAME"); return; }
-    guideStep(q, "bind", `BIND finds <b>${wk} IN CNAME ${WIPS[wk].name}.</b> in the chala.info zone. It can't answer for the target because gtm.chala.info is delegated, so it adds a referral: NS gtm-nyc.chala.info (10.1.10.53) and gtm-sea.chala.info (10.2.10.53).`, () =>
+    guideStep(q, "bind", `BIND sees the query come from ${N[q.ldns].ip}, which ${int ? `matches acl internal_nets (${INTERNAL_NET}), so it answers from the <b>internal</b> view` : `is outside ${INTERNAL_NET}, so it answers from the <b>external</b> view`}. There it finds <b>${wk} IN CNAME ${WIPS[wk].name}.</b> gtm.chala.info is delegated, so it adds a referral to the listeners' ${int ? "internal" : "public"} addresses: gtm-nyc ${lsnr("gtm-nyc", q.ldns)} and gtm-sea ${lsnr("gtm-sea", q.ldns)}.`, () =>
       spawn("bind", q.ldns, "dns", { label: "CNAME + NS", onArrive: () => {
         const C = CACHE[q.ldns]; C.cname[wk] = S.now + BIND_TTL; C.ns = S.now + BIND_TTL;
         const g = pickListener();
-        guideStep(q, q.ldns, `LDNS caches the CNAME and the delegation for ${BIND_TTL} s. It follows the CNAME and asks one of the delegated BIG-IP DNS listeners, ${g} (${N[g].listener}), for <b>${WIPS[wk].name}</b>.`, () => askGtm(q, g, 0));
+        guideStep(q, q.ldns, `LDNS caches the CNAME and the delegation for ${BIND_TTL} s. It follows the CNAME and asks one of the delegated listeners, ${g} at ${lsnr(g, q.ldns)}${int ? "" : `, which the ${DC[N[g].dc].name} edge firewall NATs to ${N[g].listener}`}, for <b>${WIPS[wk].name}</b>.`, () => askGtm(q, g, 0));
       } }));
   } });
 }
 function askGtm(q, g, attempt) {
-  const wk = q.wk, W = WIPS[wk];
+  const wk = q.wk, W = WIPS[wk], int = isInt(q.ldns), pool = poolFor(W, q.ldns);
   spawn(q.ldns, g, "dns", { label: `${W.name} A?`, onArrive: () => {
     if (!N[g].up) {
       flash(N[g].x, N[g].y, "r");
@@ -725,17 +743,19 @@ function askGtm(q, g, attempt) {
     }
     q.path.push(g);
     const d = decide(g, q.ldns, wk);
+    const topo = `Topology: LDNS ${N[q.ldns].ip} ${int ? "is in" : "is not in"} region internal_nets, so <b>${pool}</b> scores 100 and is used`;
     const ms = W.members.map(v => `${v} ${COLOR[memberSt(g, v).st]}`).join(", ");
+    const method = `Topology → ${pool} · ${d.method}`;
     if (!d.m) {
-      guideStep(q, g, `gtmd on ${g} matches wide IP ${W.name}, but no member of ${W.pool} is available (${ms}). The fallback mode return-to-dns hands the query to the BIG-IP's own BIND, which has no record: NXDOMAIN.`, () =>
-        spawn(g, q.ldns, "dns", { label: "NXDOMAIN", onArrive: () => fail(q, "NXDOMAIN", d.why, g, d.method) }));
+      guideStep(q, g, `gtmd on ${g} matches wide IP ${W.name}. ${topo}, but none of its members is available (${ms}). The fallback mode return-to-dns hands the query to the BIG-IP's own BIND, which has no record: NXDOMAIN.`, () =>
+        spawn(g, q.ldns, "dns", { label: "NXDOMAIN", onArrive: () => fail(q, "NXDOMAIN", d.why, g, method) }));
       return;
     }
-    const m = N[d.m];
-    guideStep(q, g, `gtmd on ${g} is authoritative for gtm.chala.info and matches wide IP <b>${W.name}</b>. Members of ${W.pool} as this gtmd sees them: ${ms}. ${d.method}: ${d.why}. It answers <b>${m.ip}</b> (${d.m} in ${DC[m.dc].name}) with a ${POOL_TTL} s TTL.`, () =>
-      spawn(g, q.ldns, "dns", { label: m.ip, onArrive: () => {
-        CACHE[q.ldns].a[wk] = { ip: m.ip, member: d.m, g, exp: S.now + POOL_TTL };
-        guideStep(q, q.ldns, `LDNS caches the A record for ${POOL_TTL} s and returns the whole chain to the client: ${fqdn(wk)} CNAME ${W.name}, A ${m.ip}.`, () => reply(q, m.ip, d.m, { g, method: d.method, why: d.why }));
+    const m = N[d.m], addr = addrFor(m, q.ldns);
+    guideStep(q, g, `gtmd on ${g} is authoritative for gtm.chala.info and matches wide IP <b>${W.name}</b>. ${topo}. Members as this gtmd sees them: ${ms}. ${d.method}: ${d.why}. It answers <b>${addr}</b>, the ${int ? "internal" : `public (NAT to ${m.ip})`} address of ${d.m} in ${DC[m.dc].name}, with a ${POOL_TTL} s TTL.`, () =>
+      spawn(g, q.ldns, "dns", { label: addr, onArrive: () => {
+        CACHE[q.ldns].a[wk] = { ip: addr, member: d.m, g, exp: S.now + POOL_TTL };
+        guideStep(q, q.ldns, `LDNS caches the A record for ${POOL_TTL} s and returns the whole chain to the client: ${fqdn(wk)} CNAME ${W.name}, A ${addr}.`, () => reply(q, addr, d.m, { g, method, why: d.why }));
       } }));
   } });
 }
@@ -748,7 +768,7 @@ function reply(q, ip, member, d) {
   logDns(q, ip, member, d);
   spawn(q.ldns, L.client, "dns", { label: ip, onArrive: () => {
     const m = N[member];
-    guideStep(q, L.client, `The client now has ${fqdn(q.wk)} → ${WIPS[q.wk].name} → <b>${ip}</b> and connects to ${m.id} in ${DC[m.dc].name} (${m.ip}:${m.port}). Look the name up again within ${POOL_TTL} s from this client's panel to see the LDNS answer from its cache.`, null);
+    guideStep(q, L.client, `The client now has ${fqdn(q.wk)} → ${WIPS[q.wk].name} → <b>${ip}</b> and connects to ${m.id} in ${DC[m.dc].name} at ${ip}:${m.port}${isInt(q.ldns) ? ", straight over the internal network" : `, which the edge firewall NATs to ${m.ip}`}.${q.after ? "" : ` Look the name up again within ${POOL_TTL} s from this client's panel to see the LDNS answer from its cache.`}`, null);
   } });
 }
 function fail(q, ans, why, g = "—", method = "—") {
@@ -766,7 +786,7 @@ function guideStep(q, node, html, then) {
 }
 function showHint() {
   const pop = $("#hintPop");
-  pop.innerHTML = `<div class="hs">Step ${HINT.q.n} · ${fqdn(HINT.q.wk)}</div><p>${HINT.html}</p><div class="acts"><button class="primary" data-hint="next">${HINT.then ? "Next ▸" : "Done"}</button>${HINT.then ? `<button data-hint="skip">Skip hints</button>` : ""}</div>`;
+  pop.innerHTML = `<div class="hs">Step ${HINT.q.n} · ${fqdn(HINT.q.wk)} · ${isInt(HINT.q.ldns) ? "internal" : "external"}</div><p>${HINT.html}</p><div class="acts"><button class="primary" data-hint="next">${HINT.then ? "Next ▸" : HINT.q.after ? "Next lookup ▸" : "Done"}</button>${HINT.then ? `<button data-hint="skip">Skip hints</button>` : ""}</div>`;
   pop.hidden = false;
   const wrap = $(".svgwrap");
   if (wrap.scrollWidth > wrap.clientWidth) wrap.scrollLeft = N[HINT.node].x / 1000 * wrap.scrollWidth - wrap.clientWidth / 2;
@@ -783,11 +803,14 @@ function positionHint() {
   const w = box.clientWidth, h = box.clientHeight, x = n.x / 1000 * w, y = n.y / 560 * h;
   const pw = pop.offsetWidth, ph = pop.offsetHeight;
   const half = (n.kind === "bigip" ? 31 : n.kind === "generic" ? 30 : 26) * h / 560;
-  const above = y - half - 12 - ph, below = n.y < 200 || above < 4;
-  const left = Math.max(6, Math.min(w - pw - 6, x - pw / 2));
+  const above = y - half - 12 - ph, belowTop = y + half + 12;
+  const fitsBelow = belowTop + ph <= h - 4, below = n.y < 200 || (above < 4 && fitsBelow), side = above < 4 && !fitsBelow && n.y >= 200;
+  let left = Math.max(6, Math.min(w - pw - 6, x - pw / 2)), top = below ? belowTop : above;
+  /* no room above or below: sit beside the node, on the side with more space */
+  if (side) { const hw = (n.kind === "vs" ? 84 : 70) * w / 1000 + 12; left = x > w / 2 ? x - hw - pw : x + hw; left = Math.max(6, Math.min(w - pw - 6, left)); top = Math.max(4, Math.min(h - ph - 4, y - ph / 2)); }
   pop.style.left = left + "px";
-  pop.style.top = (below ? y + half + 12 : above) + "px";
-  pop.classList.toggle("below", below); pop.classList.toggle("above", !below);
+  pop.style.top = top + "px";
+  pop.classList.toggle("below", below && !side); pop.classList.toggle("above", !below && !side);
   pop.style.setProperty("--ax", Math.max(14, Math.min(pw - 14, x - left)) + "px");
 }
 function closeHint(skip) {
@@ -797,6 +820,7 @@ function closeHint(skip) {
   if (skip || !h.then) S.guiding = false;
   S.playing = S.started = true; renderChrome(); renderSvg();
   if (h.then) h.then();
+  else if (!skip && h.q.after) h.q.after();
 }
 
 /* ---------- scenarios ---------- */
@@ -806,15 +830,15 @@ function addApp1Monitor() {
 }
 const SCEN = {
   dns: {
-    title: "DNS lookup walkthrough: app1.chala.info",
-    text: "BIND (ns1.chala.info) is authoritative for chala.info. app1.chala.info is a CNAME to app1.gtm.chala.info, and gtm.chala.info is delegated to the two BIG-IP DNS listeners. pool_app1 uses Round Trip Times, so gtmd answers with the data center closest to the client's resolver. Press Start: BIG-IP DNS connects iQuery and measures path metrics, and about 18 s later client A looks up app1.chala.info. A hint pops up at every hop, and the lab pauses until you click Next.",
-    watch: ["The client asks its LDNS, and the LDNS asks BIND first. BIND answers with a CNAME and a referral to BIG-IP DNS.", "The LDNS asks a BIG-IP DNS listener for app1.gtm.chala.info. gtmd checks member status and path metrics and picks New York, 21 ms from this LDNS against 74 ms to Seattle.", "Walk through it again from client A's panel. Within 30 s the LDNS answers from its cache. After 30 s it skips BIND, since the CNAME is cached for 3600 s, and goes straight to BIG-IP DNS.", "Background queries are off here. Turn them on in the Wide IPs card."],
+    title: "DNS lookup walkthrough: internal and external",
+    text: "Split DNS for app1.chala.info. BIND answers office resolvers (10.0.0.0/8) from its internal view and everyone else from its external view. Both views CNAME app1.chala.info to app1.gtm.chala.info and delegate gtm.chala.info to BIG-IP DNS, at internal or public listener addresses. gtmd then uses Topology to pick pool_app1_int or pool_app1_ext, and Round Trip Times inside that pool. Press Start: about 18 s in, an office client looks up the name, then a client on the internet does the same. A hint pops up at every hop, and the lab pauses until you click Next.",
+    watch: ["The office lookup goes to the internal resolver, gets the internal view from BIND, and reaches gtm listeners on 10.x.", "gtmd picks pool_app1_int and New York (4 ms vs 66 ms from the office resolver), answering 10.1.20.10.", "The internet lookup gets the external view, reaches the listeners on public NATed addresses, and gtmd picks pool_app1_ext and Seattle (17 ms vs 69 ms), answering 203.0.113.110.", "Walk through it again from either client's panel. Within 30 s the LDNS answers from its cache.", "Background queries are off here. Turn them on in the Wide IPs card."],
     sel: "client-a",
-    setup() { S.dnsOn = false; WIPS.app1.method = "rtt"; addTimer(8, () => { requestPath("gtm-nyc", "ldns-a"); requestPath("gtm-nyc", "ldns-b"); }); addTimer(18, () => dnsQuery("ldns-a", "app1", true)); },
+    setup() { S.dnsOn = false; WIPS.app1.method = "rtt"; addTimer(8, () => { requestPath("gtm-nyc", "ldns-a"); requestPath("gtm-nyc", "ldns-b"); }); addTimer(18, () => dnsQuery("ldns-a", "app1", true, () => dnsQuery("ldns-b", "app1", true))); },
   },
   baseline: {
     title: "GSLB with the bigip monitor",
-    text: "Four names in chala.info are CNAMEs into gtm.chala.info, which BIND delegates to BIG-IP DNS. app1 to app3 each have a pool of two LTM virtual servers, one per data center, monitored by bigip: the LTM's own big3d reports its virtual server status to every gtmd over iQuery, so no probes are sent. app4 is served by two generic hosts and has its own scenario.",
+    text: "Four names in chala.info are CNAMEs into gtm.chala.info, which BIND delegates to BIG-IP DNS. Office resolvers get internal answers and internet resolvers get public ones (split DNS). app1 to app3 each have a pool of two LTM virtual servers, one per data center, monitored by bigip: the LTM's own big3d reports its virtual server status to every gtmd over iQuery, so no probes are sent. app4 is served by two generic hosts and has its own scenario.",
     watch: ["Each gtmd builds 8 iQuery connections, to big3d on all four BIG-IPs, itself included. None goes to the generic host.", "Every 30 s each LTM's big3d sends one virtual server status list (teal) to both gtmds. The members turn from blue to green.", "app1 uses Round Robin, app2 Global Availability (New York first), app3 Round Trip Times.", "The LDNS caches BIND's CNAME for 3600 s and gtmd's A record for 30 s. The DNS answers tab shows which hops each lookup took."],
     setup() {},
   },
@@ -828,7 +852,7 @@ const SCEN = {
   app: {
     title: "Application failure the bigip monitor misses",
     text: "pool_app1 uses bigip and the custom HTTP monitor. pool_app2 (Round Robin here) uses only bigip. At 14:02:30 the application behind both Seattle virtual servers starts returning 503 Service Unavailable. The LTM still sees its pool members up, so both virtual servers stay green on the LTM.",
-    watch: ["ltm-sea's big3d keeps reporting vs_app2_sea green, so gtmd keeps answering 10.2.20.20 for app2.chala.info even though users get errors.", "The GET /health probe to vs_app1_sea gets 503 back. The receive string 200 OK is not found.", "After the 120 s timeout both gtmds mark vs_app1_sea red, and app1.chala.info resolves only to 10.1.20.10."],
+    watch: ["ltm-sea's big3d keeps reporting vs_app2_sea green, so gtmd keeps handing it out for app2.chala.info (10.2.20.20 inside, 203.0.113.120 outside) even though users get errors.", "The GET /health probe to vs_app1_sea gets 503 back. The receive string 200 OK is not found.", "After the 120 s timeout both gtmds mark vs_app1_sea red, and app1.chala.info resolves only to vs_app1_nyc (10.1.20.10 inside, 203.0.113.10 outside)."],
     fix: "Tick http_app1_health on app2 and watch vs_app2_sea go red too. Or click a Seattle virtual server and restore the application.",
     sel: "vs_app1_sea",
     setup() { addApp1Monitor(); WIPS.app2.method = "rr"; addTimer(30, () => { for (const v of ["vs_app1_sea", "vs_app2_sea"]) N[v].appOk = false; log("ltm-sea", "notice", "shell", "(lab) application servers behind vs_app1_sea and vs_app2_sea now return HTTP 503"); render(); }); },
@@ -836,7 +860,7 @@ const SCEN = {
   dcfail: {
     title: "Data center failover with Global Availability",
     text: "app2 uses Global Availability with vs_app2_nyc first. At 14:02:30 every pool member behind vs_app2_nyc goes down on ltm-nyc, so the virtual server turns red.",
-    watch: ["ltm-nyc's big3d reports vs_app2_nyc red in its next status list. The bigip monitor doesn't wait for a timeout.", "app2.chala.info answers switch from 10.1.20.20 to 10.2.20.20 once the LDNS's cached A record (30 s) expires.", "app1 and app3 keep answering from both data centers."],
+    watch: ["ltm-nyc's big3d reports vs_app2_nyc red in its next status list. The bigip monitor doesn't wait for a timeout.", "app2.chala.info answers switch from vs_app2_nyc to vs_app2_sea, for both the internal and the external pool, once each LDNS's cached A record (30 s) expires.", "app1 and app3 keep answering from both data centers."],
     fix: "Click vs_app2_nyc and restore its pool members. Global Availability moves answers back to New York.",
     sel: "vs_app2_nyc",
     setup() { addTimer(30, () => { N.vs_app2_nyc.vsUp = false; log("ltm-nyc", "err", "tmm", "No members available for pool /Common/app2_pool", "01010028:3"); render(); }); },
@@ -844,7 +868,7 @@ const SCEN = {
   generic: {
     title: "Generic hosts monitored through prober pools",
     text: "app4.chala.info points to pool_app4 (Global Availability), whose members are two plain web servers of server type Generic Host: gen-nyc-01 first, then gen-sea-01. They run no big3d, so they have no iQuery connection and the bigip monitor can't be used. Their custom monitor http_app4 is run by a big3d from each data center's prober pool: pp_east (set here to Global Availability: gtm-nyc, then ltm-nyc) for gen-nyc-01, and pp_west (ltm-sea, then gtm-sea) for gen-sea-01. At 14:02:40 big3d stops on gtm-nyc.",
-    watch: ["No iQuery line goes to either generic host. gtmd never talks to them directly.", "Orange GET / probes go from gtm-nyc to gen-nyc-01 and from ltm-sea to gen-sea-01. Each result travels to both gtmds over that BIG-IP's iQuery connections.", "When gtm-nyc's big3d stops, both gtmds lose iQuery to it, so the next probe of gen-nyc-01 moves to ltm-nyc, pp_east member #2. The member stays green.", "Click gen-nyc-01 and stop the web service: probes get RST, and after 120 s gtmd marks it red and app4.chala.info fails over to gen-sea-01 (10.2.30.11)."],
+    watch: ["No iQuery line goes to either generic host. gtmd never talks to them directly.", "Orange GET / probes go from gtm-nyc to gen-nyc-01 and from ltm-sea to gen-sea-01. Each result travels to both gtmds over that BIG-IP's iQuery connections.", "When gtm-nyc's big3d stops, both gtmds lose iQuery to it, so the next probe of gen-nyc-01 moves to ltm-nyc, pp_east member #2. The member stays green.", "Click gen-nyc-01 and stop the web service: probes get RST, and after 120 s gtmd marks it red and app4.chala.info fails over to gen-sea-01 (10.2.30.11 inside, 203.0.113.140 outside)."],
     fix: "Change a generic host's prober preference to Inside Data Center or the other pool and watch the prober move.",
     sel: "gen-nyc-01",
     setup() { POOLS.pp_east.method = "ga"; addTimer(40, () => { N["gtm-nyc"].big3d = false; log("gtm-nyc", "notice", "bigstart", "big3d stopped (bigstart stop big3d)"); render(); }); },
@@ -868,7 +892,7 @@ const SCEN = {
   rtt: {
     title: "Round Trip Times for app3.chala.info",
     text: "pool_app3 uses Round Trip Times. That method needs path metrics: big3d in each data center probes the LDNS and reports the RTT back over iQuery.",
-    watch: ["The first app3 query from each LDNS has no metrics, so gtmd answers with the alternate method (Round Robin) and asks for a path probe.", "Purple DNS_DOT probes go from one BIG-IP in each data center to the LDNS.", "After that, LDNS 198.51.100.53 gets New York answers (21 ms vs 74 ms) and 203.0.113.53 gets Seattle answers.", "Open the Paths tab to see the metrics each gtmd holds."],
+    watch: ["The first app3 query from each LDNS has no metrics, so gtmd answers with the alternate method (Round Robin) and asks for a path probe.", "Purple DNS_DOT probes go from one BIG-IP in each data center to the LDNS.", "After that, the office resolver 10.0.0.53 gets New York answers (4 ms vs 66 ms) and the ISP resolver 198.51.100.53 gets Seattle answers (17 ms vs 69 ms).", "Open the Paths tab to see the metrics each gtmd holds."],
     sel: "ldns-a",
     setup() { addTimer(6, () => { dnsQuery("ldns-a", "app3"); dnsQuery("ldns-b", "app3"); }); },
   },
@@ -910,15 +934,21 @@ function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); f
 function txt(attrs, s, parent) { const e = el("text", attrs, parent); e.textContent = s; return e; }
 function buildSvg() {
   const svg = $("#topo"); svg.innerHTML = "";
-  el("rect", { x: 10, y: 20, width: 980, height: 120, rx: 10, class: "zone-inet" }, svg);
-  txt({ x: 26, y: 42, class: "zlabel" }, "Internet", svg);
-  txt({ x: 26, y: 57, class: "zsub" }, "clients · local DNS resolvers · BIND", svg);
+  el("rect", { x: 10, y: 20, width: 405, height: 120, rx: 10, class: "zone-corp" }, svg);
+  txt({ x: 26, y: 42, class: "zlabel" }, "Corporate network · internal", svg);
+  txt({ x: 26, y: 57, class: "zsub" }, "office clients · internal resolver (10.0.0.0/8)", svg);
+  el("rect", { x: 425, y: 20, width: 150, height: 120, rx: 10, class: "zone-dmz" }, svg);
+  txt({ x: 441, y: 42, class: "zlabel" }, "DMZ", svg);
+  el("rect", { x: 585, y: 20, width: 405, height: 120, rx: 10, class: "zone-inet" }, svg);
+  txt({ x: 601, y: 42, class: "zlabel" }, "Internet · external", svg);
+  txt({ x: 601, y: 57, class: "zsub" }, "internet clients · ISP resolver", svg);
   for (const dc of ["nyc", "sea"]) {
     const x = dc === "nyc" ? 10 : 520;
     const g = el("g", { class: "dczone", "data-sel": "dc:" + dc, tabindex: 0 }, svg);
     el("rect", { x, y: 160, width: 470, height: 385, rx: 10, class: "zone" }, g);
     txt({ x: x + 16, y: 184, class: "zlabel" }, `${DC[dc].name} · ${DC[dc].city}`, g);
     txt({ x: x + 16, y: 200, class: "zsub", id: "dcsub-" + dc }, "", g);
+    txt({ x: x + 16, y: 534, class: "zsub" }, `edge NAT: 203.0.113.${dc === "nyc" ? "0/25" : "128/25"} ↔ 10.${dc === "nyc" ? 1 : 2}.0.0/16`, g);
   }
   el("line", { x1: 500, y1: 175, x2: 500, y2: 535, class: "wanline", id: "wanline" }, svg);
   const lines = el("g", { id: "lines" }, svg);
@@ -962,10 +992,10 @@ function buildSvg() {
       el("rect", { x: -66, y: -26, width: 132, height: 52, rx: 6, class: "nb" }, g);
       txt({ x: 0, y: -8, class: "nname", "text-anchor": "middle" }, "BIND", g);
       txt({ x: 0, y: 6, class: "nip", "text-anchor": "middle" }, `ns1 · ${n.ip}`, g);
-      txt({ x: 0, y: 19, class: "ntag", "text-anchor": "middle" }, "AUTH chala.info", g);
+      txt({ x: 0, y: 19, class: "ntag", "text-anchor": "middle" }, "2 VIEWS · chala.info", g);
     } else if (n.kind === "ldns") {
       el("rect", { x: -70, y: -24, width: 140, height: 48, rx: 24, class: "nb" }, g);
-      txt({ x: 0, y: -4, class: "nname", "text-anchor": "middle" }, "LDNS " + n.id.slice(-1).toUpperCase(), g);
+      txt({ x: 0, y: -4, class: "nname", "text-anchor": "middle" }, `LDNS ${n.id.slice(-1).toUpperCase()} · ${n.internal ? "internal" : "ISP"}`, g);
       txt({ x: 0, y: 11, class: "nip", "text-anchor": "middle" }, n.ip, g);
     } else {
       el("rect", { x: -48, y: -20, width: 96, height: 40, rx: 6, class: "nb" }, g);
@@ -1052,7 +1082,7 @@ function renderInspector() {
     if (n.kind === "bigip") {
       const vss = VSS.filter(v => N[v].server === n.id);
       h += `<h3>${n.id}<span class="badge">${n.model}</span></h3>
-      <dl class="kv"><dt>Data center</dt><dd>${DC[n.dc].name}</dd><dt>Self IP</dt><dd>${n.ip}</dd>${n.dns ? `<dt>DNS listener</dt><dd>${n.listener}:53</dd><dt>Authoritative for</dt><dd>gtm.chala.info</dd>` : ""}<dt>Processes</dt><dd>${n.dns ? "gtmd, " : ""}big3d${n.dns ? "" : ", tmm"}</dd><dt>Server monitor</dt><dd>/Common/bigip</dd></dl>`;
+      <dl class="kv"><dt>Data center</dt><dd>${DC[n.dc].name}</dd><dt>Self IP</dt><dd>${n.ip}</dd>${n.dns ? `<dt>DNS listener</dt><dd>${n.listener}:53 (public ${n.pub}, NAT)</dd><dt>Authoritative for</dt><dd>gtm.chala.info</dd>` : ""}<dt>Processes</dt><dd>${n.dns ? "gtmd, " : ""}big3d${n.dns ? "" : ", tmm"}</dd><dt>Server monitor</dt><dd>/Common/bigip</dd></dl>`;
       if (!n.dns) h += proberFields(n, " (for custom monitors on this server's virtual servers)");
       h += `<div class="live" id="live"></div>
       <div class="acts">
@@ -1064,7 +1094,7 @@ function renderInspector() {
     } else if (n.kind === "vs" || n.kind === "generic") {
       const W = WIPS[n.wip], gen = n.kind === "generic";
       h += `<h3>${n.id}<span class="badge">${gen ? "Generic host" : "Virtual server"}</span></h3>
-      <dl class="kv"><dt>Server</dt><dd>/Common/${n.server} (${gen ? "Generic Host" : "BIG-IP LTM"})</dd><dt>Destination</dt><dd>${n.ip}:${n.port}</dd><dt>Data center</dt><dd>${DC[n.dc].name}</dd><dt>Name</dt><dd>${fqdn(n.wip)} → ${W.name}</dd><dt>GTM pool</dt><dd>/Common/${W.pool} · ${METHODS[W.method]}</dd><dt>Monitor</dt><dd>${esc(monRule(W))}</dd>${gen ? `<dt>big3d / iQuery</dt><dd>none</dd>` : ""}</dl>`;
+      <dl class="kv"><dt>Server</dt><dd>/Common/${n.server} (${gen ? "Generic Host" : "BIG-IP LTM"})</dd><dt>Internal address</dt><dd>${n.ip}:${n.port}</dd><dt>Public address</dt><dd>${n.pub}:${n.port} (edge NAT → ${n.ip})</dd><dt>Data center</dt><dd>${DC[n.dc].name}</dd><dt>Name</dt><dd>${fqdn(n.wip)} → ${W.name}</dd><dt>GTM pools</dt><dd>/Common/${W.pool}_int, /Common/${W.pool}_ext · ${METHODS[W.method]}</dd><dt>Monitor</dt><dd>${esc(monRule(W))}</dd>${gen ? `<dt>big3d / iQuery</dt><dd>none</dd>` : ""}</dl>`;
       if (gen) h += proberFields(n, "");
       h += `<div class="live" id="live"></div>
       <div class="acts">
@@ -1074,18 +1104,18 @@ function renderInspector() {
       <p class="small" style="margin:0">${gen ? "A generic host runs no big3d, so it has no iQuery connection and can't use the bigip monitor. gtmd learns its status only from custom monitor probes sent by a BIG-IP big3d, picked by the prober preference above." : "Failing the LTM pool members turns the virtual server red on the LTM, and the bigip monitor reports that. An HTTP 503 from the application leaves the LTM virtual server green. Only a custom HTTP or HTTPS monitor with a receive string notices it."}</p>`;
     } else if (n.kind === "bind") {
       h += `<h3>ns1.chala.info<span class="badge">BIND</span></h3>
-      <dl class="kv"><dt>Address</dt><dd>${n.ip}:53</dd><dt>Authoritative for</dt><dd>chala.info</dd><dt>Delegates</dt><dd>gtm.chala.info → gtm-nyc, gtm-sea</dd><dt>named</dt><dd>${n.up ? "running" : "stopped"}</dd></dl>
-      <p class="small" style="margin:0">BIND never sees the wide IPs. It answers each appN.chala.info with a CNAME to appN.gtm.chala.info and refers resolvers to BIG-IP DNS for that subdomain.</p>
-      <div class="acts"><button data-act="bind:x" class="${n.up ? "warn" : "primary"}">${n.up ? "Stop named" : "Start named"}</button><button data-act="tab:zone">Show zone file</button></div>`;
+      <dl class="kv"><dt>Address</dt><dd>${n.ip}:53</dd><dt>Authoritative for</dt><dd>chala.info</dd><dt>View internal</dt><dd>match-clients ${INTERNAL_NET} · gtm NS ${N["gtm-nyc"].listener}, ${N["gtm-sea"].listener}</dd><dt>View external</dt><dd>match-clients any · gtm NS ${N["gtm-nyc"].pub}, ${N["gtm-sea"].pub}</dd><dt>named</dt><dd>${n.up ? "running" : "stopped"}</dd></dl>
+      <p class="small" style="margin:0">BIND never sees the wide IPs. In both views it answers each appN.chala.info with a CNAME to appN.gtm.chala.info and refers resolvers to BIG-IP DNS, at the listener addresses that side can reach.</p>
+      <div class="acts"><button data-act="bind:x" class="${n.up ? "warn" : "primary"}">${n.up ? "Stop named" : "Start named"}</button><button data-act="tab:zone">Show named.conf and zones</button></div>`;
     } else if (n.kind === "ldns") {
-      h += `<h3>LDNS ${n.id.slice(-1).toUpperCase()}<span class="badge">Resolver</span></h3>
-      <dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>Real RTT</dt><dd>dc_nyc ${n.rtt.nyc} ms · dc_sea ${n.rtt.sea} ms</dd></dl>
+      h += `<h3>LDNS ${n.id.slice(-1).toUpperCase()}<span class="badge">${n.internal ? "Internal resolver" : "ISP resolver"}</span></h3>
+      <dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>BIND view</dt><dd>${viewOf(n.id)}</dd><dt>GTM topology</dt><dd>${n.internal ? "in" : "not in"} internal_nets → _${n.internal ? "int" : "ext"} pools</dd><dt>Real RTT</dt><dd>dc_nyc ${n.rtt.nyc} ms · dc_sea ${n.rtt.sea} ms</dd></dl>
       <div class="live" id="live"></div>
       <div class="acts">${lookupButtons(n.id)}</div>
       <div class="acts"><button data-act="flushc:${n.id}">rndc flush (clear cache)</button><button data-act="flush:${n.id}">Delete path metrics</button></div>`;
     } else {
       const L = LDNS.find(l => N[l].client === n.id);
-      h += `<h3>Client ${n.id.slice(-1).toUpperCase()}<span class="badge">Stub resolver</span></h3><dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>Uses LDNS</dt><dd>${N[L].ip}</dd></dl>
+      h += `<h3>Client ${n.id.slice(-1).toUpperCase()}<span class="badge">${N[L].internal ? "Office" : "Internet"}</span></h3><dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>Uses LDNS</dt><dd>${ldnsName(L)} · ${N[L].ip}</dd><dt>Gets</dt><dd>${N[L].internal ? "internal (10.x) answers" : "public (203.0.113.x) answers"}</dd></dl>
       <span class="lbl">Walk through a lookup, with hints</span><div class="acts">${WKEYS.map(w => `<button class="primary" data-act="guide:${L}:${w}">${fqdn(w)}</button>`).join("")}</div>
       <span class="lbl">Quick lookup</span><div class="acts">${lookupButtons(L)}</div>`;
     }
@@ -1157,11 +1187,11 @@ function renderWip() {
   let h = `<h3>Wide IPs<span class="badge">gtm.chala.info</span></h3><span class="small" id="wipvg"></span>`;
   for (const k of WKEYS) {
     const W = WIPS[k];
-    h += `<div class="pool"><div class="pool-head"><b>${W.name}</b><select aria-label="${W.pool} load balancing mode" data-set="wmethod:${k}">${Object.entries(METHODS).map(([v, l]) => opt(v, W.method, l)).join("")}</select></div>
-    <span class="small">CNAME from ${fqdn(k)} · pool /Common/${W.pool}${W.method === "rtt" ? " · alternate Round Robin" : ""} · TTL ${POOL_TTL} s · fallback return-to-dns</span>
+    h += `<div class="pool"><div class="pool-head"><b>${W.name}</b><select aria-label="${W.pool} pools load balancing mode" data-set="wmethod:${k}">${Object.entries(METHODS).map(([v, l]) => opt(v, W.method, l)).join("")}</select></div>
+    <span class="small">CNAME from ${fqdn(k)} · Topology picks ${W.pool}_int (internal LDNS) or ${W.pool}_ext. Both pools: ${METHODS[W.method]}${W.method === "rtt" ? ", alternate Round Robin" : ""}, TTL ${POOL_TTL} s, fallback return-to-dns</span>
     <div class="chk"><span class="small">Monitors</span>${Object.keys(MONS).map(mn => `<label${mn === "bigip" && W.generic ? ' title="The bigip monitor needs a BIG-IP server"' : ""}><input type="checkbox" data-set="wmon:${k}:${mn}" ${W.mons.includes(mn) ? "checked" : ""}${mn === "bigip" && W.generic ? " disabled" : ""}>${mn}</label>`).join("")}</div>
     <div class="live" id="wl-${k}"></div>
-    <div class="acts"><button data-act="dnsq:ldns-a:${k}">Look up from LDNS A</button><button data-act="dnsq:ldns-b:${k}">Look up from LDNS B</button></div></div>`;
+    <div class="acts"><button data-act="dnsq:ldns-a:${k}">Look up from office</button><button data-act="dnsq:ldns-b:${k}">Look up from internet</button></div></div>`;
   }
   h += `<div class="acts"><label class="small" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="dnsOn" data-set="dnson:x" ${S.dnsOn ? "checked" : ""}>Generate random DNS queries</label></div>`;
   $("#wip").innerHTML = h;
@@ -1170,7 +1200,7 @@ function renderWip() {
 function renderWipLive() {
   const vg = S.viewGtm, top = $("#wipvg"); if (!top) return;
   top.textContent = `Member dots show status as seen by gtmd@${vg}.`;
-  for (const k of WKEYS) $("#wl-" + k).innerHTML = WIPS[k].members.map(v => `<span class="pill"><span class="dot ${N[vg].up ? DOTC[memberSt(vg, v).st] : "k"}"></span>${v} · ${N[v].ip}</span>`).join("");
+  for (const k of WKEYS) $("#wl-" + k).innerHTML = WIPS[k].members.map(v => `<span class="pill"><span class="dot ${N[vg].up ? DOTC[memberSt(vg, v).st] : "k"}"></span>${v} · ${N[v].ip} / ${N[v].pub}</span>`).join("");
   document.querySelectorAll("[data-pok]").forEach(d => d.className = "dot " + (proberOk(d.dataset.pok) ? "g" : "r"));
 }
 function renderMons() {
@@ -1223,6 +1253,8 @@ function confText() {
   const tm = r => r === "inherit" ? "inherit" : r === "inside" ? "inside-datacenter" : r === "outside" ? "outside-datacenter" : r === "any" ? "any-available" : r === "none" ? "none" : "pool";
   const ppool = (pref, fb) => [pref, fb].find(r => r.startsWith("pool:"));
   const proberLines = n => { const L = [`    prober-fallback ${tm(n.fb)}`, `    prober-preference ${tm(n.pref)}`], pp = ppool(n.pref, n.fb); if (pp) L.push(`    prober-pool /Common/${pp.slice(5)}`); return L; };
+  /* each real virtual server gets an internal object and an external one with a translation address */
+  const vsLines = id => { const v = N[id]; return [`        ${v.vsName} { destination ${v.ip}:${v.port} }`, `        ${v.vsName}_ext { destination ${v.pub}:${v.port} translation-address ${v.ip} translation-port ${v.port} }`]; };
   const L = [];
   for (const d of Object.values(DC)) L.push(`gtm datacenter /Common/${d.name} {`, ...proberLines(d), `}`);
   for (const p of Object.values(POOLS)) {
@@ -1232,12 +1264,12 @@ function confText() {
     const n = N[b], vss = VSS.filter(v => N[v].server === b);
     L.push(`gtm server /Common/${b} {`, `    datacenter /Common/${DC[n.dc].name}`, `    devices {`, `        ${b} { addresses { ${n.ip} { } } }`, `    }`, `    monitor /Common/bigip`, `    product bigip`);
     if (!n.dns) L.push(...proberLines(n));
-    if (vss.length) L.push(`    virtual-servers {`, ...vss.map(v => `        ${v} { destination ${N[v].ip}:${N[v].port} }`), `    }`);
+    if (vss.length) L.push(`    virtual-servers {`, ...vss.flatMap(vsLines), `    }`);
     L.push(`}`);
   }
   for (const id of GENS) {
     const gn = N[id];
-    L.push(`gtm server /Common/${id} {`, `    addresses { ${gn.ip} { device-name ${id} } }`, `    datacenter /Common/${DC[gn.dc].name}`, `    product generic-host`, ...proberLines(gn), `    virtual-servers {`, `        ${gn.vsName} { destination ${gn.ip}:${gn.port} }`, `    }`, `}`);
+    L.push(`gtm server /Common/${id} {`, `    addresses { ${gn.ip} { device-name ${id} } }`, `    datacenter /Common/${DC[gn.dc].name}`, `    product generic-host`, ...proberLines(gn), `    virtual-servers {`, ...vsLines(id), `    }`, `}`);
   }
   for (const m of Object.values(MONS)) {
     if (m.builtin) continue;
@@ -1245,38 +1277,63 @@ function confText() {
     if (isWeb(m)) L.push(`    recv "${m.recv}"`, `    send "${m.send}"`);
     L.push(`    timeout ${m.timeout}`, `}`);
   }
-  for (const W of Object.values(WIPS)) {
-    L.push(`gtm pool a /Common/${W.pool} {`, `    alternate-mode round-robin`, `    fallback-mode return-to-dns`, `    load-balancing-mode ${TMSH_LB[W.method]}`, `    members {`, ...W.members.map((v, i) => `        /Common/${N[v].server}:/Common/${N[v].vsName} { member-order ${i} }`), `    }`);
+  for (const W of Object.values(WIPS)) for (const side of ["int", "ext"]) {
+    L.push(`gtm pool a /Common/${W.pool}_${side} {`, `    alternate-mode round-robin`, `    fallback-mode return-to-dns`, `    load-balancing-mode ${TMSH_LB[W.method]}`, `    members {`, ...W.members.map((v, i) => `        /Common/${N[v].server}:/Common/${N[v].vsName}${side === "ext" ? "_ext" : ""} { member-order ${i} }`), `    }`);
     if (W.mons.length) L.push(`    monitor ${W.mons.map(m => "/Common/" + m).join(" and ")}`);
     L.push(`    ttl ${POOL_TTL}`, `}`);
   }
-  for (const W of Object.values(WIPS)) L.push(`gtm wideip a /Common/${W.name} {`, `    pools {`, `        /Common/${W.pool} { order 0 }`, `    }`, `}`);
+  L.push(`gtm region /Common/internal_nets {`, `    region-members {`, `        subnet ${INTERNAL_NET} { }`, `    }`, `}`);
+  for (const side of ["int", "ext"]) L.push(`gtm region /Common/${side === "int" ? "internal" : "external"}_pools {`, `    region-members {`, ...WKEYS.map(w => `        pool /Common/${WIPS[w].pool}_${side} { }`), `    }`, `}`);
+  L.push(`gtm topology ldns: region /Common/internal_nets server: region /Common/internal_pools {`, `    score 100`, `}`, `gtm topology ldns: not region /Common/internal_nets server: region /Common/external_pools {`, `    score 100`, `}`);
+  for (const W of Object.values(WIPS)) L.push(`gtm wideip a /Common/${W.name} {`, `    pool-lb-mode topology`, `    pools {`, `        /Common/${W.pool}_int { order 0 }`, `        /Common/${W.pool}_ext { order 1 }`, `    }`, `}`);
   return L.join("\n");
 }
 function zoneText() {
   const pad = s => s.padEnd(9);
+  const zone = view => {
+    const pub = view === "external", l = g => pub ? N[g].pub : N[g].listener;
+    return [
+      `; ---- /var/named/db.chala.info.${view}`,
+      "$ORIGIN chala.info.",
+      `$TTL ${BIND_TTL}`,
+      "@        IN SOA  ns1.chala.info. hostmaster.chala.info. ( 2026102701 3600 600 1209600 300 )",
+      "         IN NS   ns1.chala.info.",
+      `${pad("ns1")}IN A    ${N.bind.ip}`,
+      "",
+      `; gtm.chala.info is delegated to the BIG-IP DNS listeners (${pub ? "public, NATed at each edge" : "internal addresses"})`,
+      `${pad("gtm")}IN NS   gtm-nyc.chala.info.`,
+      `${pad("gtm")}IN NS   gtm-sea.chala.info.`,
+      `${pad("gtm-nyc")}IN A    ${l("gtm-nyc")}`,
+      `${pad("gtm-sea")}IN A    ${l("gtm-sea")}`,
+      "",
+      "; each app is a CNAME into the delegated subdomain, where a wide IP answers",
+      ...WKEYS.map(w => `${pad(w)}IN CNAME ${WIPS[w].name}.`),
+      ...(pub ? [] : ["", "; internal-only records", `${pad("intranet")}IN A    10.1.50.10`]),
+    ];
+  };
   return [
-    "$ORIGIN chala.info.",
-    `$TTL ${BIND_TTL}`,
-    "@        IN SOA  ns1.chala.info. hostmaster.chala.info. (",
-    "                 2026102701 ; serial",
-    "                 3600 600 1209600 300 )",
-    "         IN NS   ns1.chala.info.",
-    `${pad("ns1")}IN A    ${N.bind.ip}`,
+    "// ---- /etc/named.conf (excerpt)",
+    `acl internal_nets { ${INTERNAL_NET}; };`,
     "",
-    "; gtm.chala.info is delegated to the BIG-IP DNS listeners",
-    `${pad("gtm")}IN NS   gtm-nyc.chala.info.`,
-    `${pad("gtm")}IN NS   gtm-sea.chala.info.`,
-    `${pad("gtm-nyc")}IN A    ${N["gtm-nyc"].listener}   ; listener on gtm-nyc`,
-    `${pad("gtm-sea")}IN A    ${N["gtm-sea"].listener}   ; listener on gtm-sea`,
+    'view "internal" {',
+    "    match-clients { internal_nets; };",
+    "    recursion no;",
+    '    zone "chala.info" { type master; file "db.chala.info.internal"; };',
+    "};",
+    'view "external" {',
+    "    match-clients { any; };",
+    "    recursion no;",
+    '    zone "chala.info" { type master; file "db.chala.info.external"; };',
+    "};",
     "",
-    "; each app is a CNAME into the delegated subdomain, where a wide IP answers",
-    ...WKEYS.map(w => `${pad(w)}IN CNAME ${WIPS[w].name}.`),
+    ...zone("internal"),
+    "",
+    ...zone("external"),
   ].join("\n");
 }
 
 /* ---------- console ---------- */
-const TABS = [["log", "/var/log/gtm"], ["dns", "DNS answers"], ["mon", "monitor instances"], ["iquery", "show gtm iquery"], ["path", "show gtm path"], ["conf", "bigip_gtm.conf"], ["zone", "db.chala.info"], ["iqdump", "iqdump"]];
+const TABS = [["log", "/var/log/gtm"], ["dns", "DNS answers"], ["mon", "monitor instances"], ["iquery", "show gtm iquery"], ["path", "show gtm path"], ["conf", "bigip_gtm.conf"], ["zone", "named.conf / zones"], ["iqdump", "iqdump"]];
 function renderTabs() {
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" data-tab="${k}">${l}</button>`).join("");
   const bar = $("#cbar");
@@ -1286,7 +1343,7 @@ function renderTabs() {
   else if (S.tab === "path") bar.innerHTML = `<span>Path metrics learned from big3d probes of each LDNS (TTL ${PATH_TTL} s)</span>`;
   else if (S.tab === "dns") bar.innerHTML = `<span>Lookups of appN.chala.info, newest first, with the hops each one took</span>`;
   else if (S.tab === "conf") bar.innerHTML = `<span>root@(gtm-nyc)(cfg-sync In Sync)(Active)(/Common)(tmos)# list gtm (simplified)</span>`;
-  else if (S.tab === "zone") bar.innerHTML = `<span>ns1.chala.info:/var/named/db.chala.info</span>`;
+  else if (S.tab === "zone") bar.innerHTML = `<span>ns1.chala.info: split-horizon views and their zone files</span>`;
   else bar.innerHTML = `<label for="iqdSel">[root@${CONN[S.iqd].g}:Active] # iqdump</label><select id="iqdSel">${Object.values(CONN).map(c => `<option value="${c.key}"${c.key === S.iqd ? " selected" : ""}>${N[c.b].ip} (gtmd@${c.g} → big3d@${c.b})</option>`).join("")}</select><span>simplified XML</span>`;
   const sel = $("#iqdSel"); if (sel) sel.onchange = e => { S.iqd = e.target.value; renderTabs(); renderConsole(); };
 }
