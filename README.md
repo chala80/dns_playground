@@ -26,5 +26,5 @@ Click any device, virtual server, iQuery line, data center or the WAN link to br
 
 ## Caveats
 
-- Time is compressed: 1 real second is 5 simulated seconds at 1×.
+- 1× is real time with BIG-IP default timers (iQuery heartbeat 10 s, bigip monitor 30 s / 90 s, custom monitors 30 s / 120 s, path TTL 2400 s). Use 5× to 20× to skip ahead. Packets in flight are slowed down so they are visible.
 - Log lines, iQuery XML and config are modeled on real output but simplified. Some edge behavior is approximated. Verify against a real device.

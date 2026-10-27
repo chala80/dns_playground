@@ -254,7 +254,7 @@ code{font-family:var(--f-mono);font-size:12px}
     </div>
     <div class="card">
       <h4>About this model</h4>
-      <p>Timing is compressed: one real second is 5 simulated seconds at 1×. Monitor defaults follow BIG-IP DNS (bigip 30 s / 90 s, custom 30 s / 120 s). Log lines, iQuery XML and the config tab are modeled on real <code>/var/log/gtm</code>, <code>iqdump</code> and <code>bigip_gtm.conf</code> output but simplified, so check a real device for exact text. Real CLI to try: <code>tmsh show gtm iquery</code>, <code>tmsh show gtm pool a</code>, <code>tmsh list gtm monitor</code>, <code>iqdump 10.1.10.10</code>.</p>
+      <p>1× is real time and uses BIG-IP defaults: iQuery heartbeat 10 s, bigip monitor 30 s / 90 s, custom monitors 30 s / 120 s, path TTL 2400 s. Use 5× to 20× to skip ahead. Packets in flight are slowed down so you can see them; real iQuery messages take milliseconds. Log lines, iQuery XML and the config tab are modeled on real <code>/var/log/gtm</code>, <code>iqdump</code> and <code>bigip_gtm.conf</code> output but simplified, so check a real device for exact text. Real CLI to try: <code>tmsh show gtm iquery</code>, <code>tmsh show gtm pool a</code>, <code>tmsh list gtm monitor</code>, <code>iqdump 10.1.10.10</code>.</p>
     </div>
   </section>
 </div>
@@ -262,7 +262,7 @@ code{font-family:var(--f-mono);font-size:12px}
 <script>
 (() => {
 "use strict";
-const SIM_RATE = 5, PATH_TTL = 2400;
+const SIM_RATE = 1, PATH_TTL = 2400;
 const BASE = new Date(2026, 9, 27, 14, 2, 0).getTime();
 const $ = s => document.querySelector(s);
 const NS = "http://www.w3.org/2000/svg";
@@ -272,7 +272,7 @@ const LTMS = ["ltm-nyc", "ltm-sea"];
 const LDNS = ["ldns-a", "ldns-b"];
 const WKEYS = ["www", "api", "shop"];
 const VSS = ["nyc", "sea"].flatMap(dc => WKEYS.map(w => `vs_${w}_${dc}`));
-const SPEEDS = [0.5, 1, 2, 4, 8];
+const SPEEDS = [1, 2, 5, 10, 20];
 const TYPES = {
   iq: "iQuery keepalive / control",
   result: "Status / monitor result (big3d → gtmd)",
@@ -390,7 +390,7 @@ function spawn(from, to, type, o = {}) {
   const geom = o.geom || { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
   const dist = Math.hypot(geom.x2 - geom.x1, geom.y2 - geom.y1);
   const drop = o.drop ?? !reach(from, to);
-  PK.push({ type, geom, t0: S.now, dur: 1.6 + dist / 260, drop, label: o.label || "", onArrive: o.onArrive, el: null });
+  PK.push({ type, geom, t0: S.now, dur: 0.9 + dist / 450, drop, label: o.label || "", onArrive: o.onArrive, el: null });
 }
 function flash(x, y, cls) { FL.push({ x, y, cls, t0: S.now, el: null }); }
 function iqGeom(c, reverse) { const g = connGeom(c); return reverse ? { x1: g.x2, y1: g.y2, cx: g.cx, cy: g.cy, x2: g.x1, y2: g.y1 } : g; }
@@ -1125,7 +1125,7 @@ function renderChrome() {
   $("#clock").textContent = ts(S.now);
   $("#play").textContent = S.playing ? "Pause" : S.started ? "Play" : "Start";
   $("#play").setAttribute("aria-pressed", String(S.playing));
-  $("#speed").innerHTML = SPEEDS.map(s => `<button data-speed="${s}" aria-pressed="${S.speed === s}">${s}×</button>`).join("");
+  $("#speed").innerHTML = SPEEDS.map(s => `<button data-speed="${s}" aria-pressed="${S.speed === s}"${s === 1 ? ' title="Real time"' : ""}>${s}×</button>`).join("");
   $("#viewAs").innerHTML = GTMS.map(g => `<button data-view="${g}" aria-pressed="${S.viewGtm === g}">${g}</button>`).join("");
   $("#legend").innerHTML = Object.entries(TYPES).map(([k, l]) => `<label><input type="checkbox" data-show="${k}" ${S.show[k] ? "checked" : ""}><span class="sw" style="background:var(--${k})"></span>${l}</label>`).join("");
 }
