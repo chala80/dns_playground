@@ -11,7 +11,7 @@
 <style>
 /* Layout: ops console. Topology canvas on the left, inspector + config rail on the right, tabbed tmsh-style console underneath. */
 :root{
-  --bg:#e8ecf0; --panel:#fbfcfd; --sunk:#f0f3f6; --zone:#dfe6ec; --inet:#e9e4f3;
+  --bg:#e8ecf0; --panel:#fbfcfd; --sunk:#f0f3f6; --zone:#dfe6ec; --inet:#e9e4f3; --corp:#e2eee6; --dmz:#f1ebdf;
   --ink:#15212c; --muted:#56656f; --line:#cbd4dc; --wire:#9eacb8;
   --accent:#2450c9; --accent-ink:#ffffff;
   --iq:#2450c9; --probe:#c27400; --result:#08857a; --path:#7b47d1; --dns:#c22d6a;
@@ -21,7 +21,7 @@
   --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b;
+  --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b; --corp:#16241c; --dmz:#25211a;
   --ink:#e2e9ef; --muted:#93a3b1; --line:#2a3743; --wire:#4c5c6a;
   --accent:#6f95ff; --accent-ink:#0b1220;
   --iq:#6f95ff; --probe:#f0a52a; --result:#2fc4b0; --path:#ad86ff; --dns:#ff6aa4;
@@ -29,7 +29,7 @@
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
-  --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b;
+  --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b; --corp:#16241c; --dmz:#25211a;
   --ink:#e2e9ef; --muted:#93a3b1; --line:#2a3743; --wire:#4c5c6a;
   --accent:#6f95ff; --accent-ink:#0b1220;
   --iq:#6f95ff; --probe:#f0a52a; --result:#2fc4b0; --path:#ad86ff; --dns:#ff6aa4;
@@ -46,6 +46,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--a
 button.warn{border-color:var(--r);color:var(--r)}
 button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 select{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 6px;font-size:13px;max-width:100%}
+input[type=text],input[type=number],textarea{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 6px;font-size:13px;width:100%;min-width:0}
+textarea{font-family:var(--f-mono);font-size:12px;resize:vertical}
 .mono{font-family:var(--f-mono);font-size:12px}
 
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px}
@@ -73,18 +75,30 @@ header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:spac
 .legend label{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none}
 .legend .sw{width:10px;height:10px;border-radius:50%;display:inline-block}
 .svgwrap{overflow-x:auto}
-svg#topo{display:block;width:100%;min-width:680px;height:auto}
+.svgin{position:relative;min-width:680px}
+svg#topo{display:block;width:100%;height:auto}
+.hint-pop{position:absolute;z-index:5;width:min(310px,calc(100% - 12px));background:var(--panel);border:2px solid var(--dns);border-radius:10px;padding:10px 12px;box-shadow:0 10px 28px rgba(0,0,0,.22);font-size:13px;line-height:1.45}
+.hint-pop .hs{font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dns)}
+.hint-pop p{margin:4px 0 8px}
+.hint-pop::before{content:"";position:absolute;left:var(--ax,50%);width:12px;height:12px;background:var(--panel);border:2px solid var(--dns);transform:translateX(-50%) rotate(45deg)}
+.hint-pop.below::before{top:-8px;border-right:0;border-bottom:0}
+.hint-pop.above::before{bottom:-8px;border-left:0;border-top:0}
+.hint-pop.sheet{position:fixed;left:12px;right:12px;bottom:12px;top:auto!important;width:auto;max-height:55vh;overflow:auto;z-index:20}
+.hint-pop.sheet::before,.hint-pop:not(.above):not(.below)::before{display:none}
 .hint{padding:8px 14px 12px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line)}
 
 /* topology */
 .zone{fill:var(--zone)}
 .zone-inet{fill:var(--inet)}
+.zone-corp{fill:var(--corp)}
+.zone-dmz{fill:var(--dmz)}
 .zlabel{font-family:var(--f-disp);font-stretch:80%;font-weight:700;font-size:15px;fill:var(--ink)}
 .zsub{font-family:var(--f-mono);font-size:10.5px;fill:var(--muted)}
 .nb{fill:var(--panel);stroke:var(--wire);stroke-width:1.2}
 .node{cursor:pointer}
 .node:hover .nb{stroke:var(--accent)}
 .node.sel .nb{stroke:var(--accent);stroke-width:2.6}
+.node.hl .nb{stroke:var(--dns);stroke-width:3}
 .node.off .nb{stroke-dasharray:4 3;fill:var(--sunk)}
 .node.off text{opacity:.5}
 .nname{font-family:var(--f-disp);font-stretch:85%;font-weight:700;font-size:14px;fill:var(--ink)}
@@ -93,9 +107,7 @@ svg#topo{display:block;width:100%;min-width:680px;height:auto}
 .lt{font-family:var(--f-mono);font-size:9.5px;fill:var(--muted)}
 .light{stroke:none}
 .c-g{fill:var(--g)} .c-r{fill:var(--r)} .c-b{fill:var(--b)} .c-k{fill:var(--k)} .c-y{fill:var(--y)}
-.vs{cursor:pointer}
-.vs rect{fill:var(--sunk);stroke:var(--wire)}
-.vs text{font-family:var(--f-mono);font-size:10.5px;fill:var(--ink)}
+.apperr{font-family:var(--f-mono);font-size:9.5px;font-weight:700;fill:var(--r)}
 .stem{stroke:var(--wire);stroke-width:1.2}
 .iql{fill:none;stroke-width:1.6;transition:stroke .3s}
 .iql.st-connected{stroke:var(--iq);opacity:.55}
@@ -104,7 +116,7 @@ svg#topo{display:block;width:100%;min-width:680px;height:auto}
 .iql.st-ssl{stroke:var(--r);stroke-dasharray:6 4;opacity:.9}
 .iql.sel{stroke-width:3.4;opacity:1}
 .hit{fill:none;stroke:transparent;stroke-width:12;cursor:pointer}
-.assign{stroke:var(--probe);stroke-width:1.4;stroke-dasharray:2 4;opacity:.8}
+.assign{stroke:var(--probe);stroke-width:1.4;stroke-dasharray:2 4;opacity:.8;pointer-events:none}
 .wanline{stroke:var(--wire);stroke-width:3;stroke-dasharray:1 7;stroke-linecap:round}
 .wanline.down{stroke:var(--r)}
 .wan{cursor:pointer}
@@ -144,6 +156,10 @@ svg#topo{display:block;width:100%;min-width:680px;height:auto}
 .pm .mini button{padding:1px 6px;font-size:12px}
 .small{font-size:12px;color:var(--muted)}
 .live{display:flex;flex-direction:column;gap:6px}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.chk{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
+.chk label{display:inline-flex;gap:5px;align-items:center;font-family:var(--f-mono);font-size:12px;cursor:pointer}
+.small.err{color:var(--r)}
 
 /* console */
 .console .tabs{display:flex;flex-wrap:wrap;gap:2px;padding:8px 10px 0;border-bottom:1px solid var(--line)}
@@ -177,11 +193,11 @@ code{font-family:var(--f-mono);font-size:12px}
   <header class="top">
     <div class="brand">
       <h1>BIG-IP DNS Traffic Lab</h1>
-      <p>A running model of two BIG-IP DNS devices in one sync group. Watch gtmd talk to big3d over iQuery, see which big3d probes each server, and break things to see what changes.</p>
+      <p>Split-horizon GSLB with F5 BIG-IP DNS for chala.info: BIND is authoritative for the zone and delegates gtm.chala.info to two BIG-IP DNS devices in two data centers. Office clients get internal addresses and internet clients get public ones. Follow a lookup hop by hop, and watch how the bigip monitor, custom monitors and generic hosts feed gtmd the status it answers from.</p>
     </div>
     <div class="transport">
       <span class="clock" id="clock">Oct 27 14:02:00</span>
-      <button class="primary" id="play" aria-pressed="true">Pause</button>
+      <button class="primary" id="play" aria-pressed="false">Start</button>
       <div class="seg" id="speed" role="group" aria-label="Simulation speed"></div>
       <button id="reset">Reset</button>
     </div>
@@ -191,7 +207,7 @@ code{font-family:var(--f-mono);font-size:12px}
     <div class="pick">
       <span class="lbl">Scenario</span>
       <select id="scenSel" aria-label="Choose scenario"></select>
-      <button id="scenRun" class="primary">Run scenario</button>
+      <button id="scenRun" class="primary">Load scenario</button>
     </div>
     <div id="scenText"></div>
   </section>
@@ -205,14 +221,18 @@ code{font-family:var(--f-mono);font-size:12px}
           <div class="seg" id="viewAs" role="group" aria-label="Status as seen by gtmd"></div>
         </div>
       </div>
-      <div class="svgwrap"><svg id="topo" viewBox="0 0 1000 560" role="img" aria-label="BIG-IP DNS topology with two data centers"></svg></div>
-      <div class="hint">Click any device, data center, iQuery line or the WAN link to inspect and change it. Dashed orange lines show which big3d currently probes each generic host. Status dots use BIG-IP colors: green available, red offline, blue unknown.</div>
+      <div class="svgwrap"><div class="svgin">
+        <svg id="topo" viewBox="0 0 1000 560" role="img" aria-label="BIG-IP DNS GSLB topology with BIND and two data centers"></svg>
+        <div class="hint-pop" id="hintPop" role="dialog" aria-live="polite" hidden></div>
+      </div></div>
+      <div class="hint">Click any device, virtual server, generic host, BIND, a data center, an iQuery line or the WAN link to inspect and change it. Dashed orange lines show which big3d runs each custom monitor instance. Member dots show pool member status as seen by the selected gtmd: green available, red offline, blue unknown.</div>
     </section>
 
     <aside class="side">
       <section class="card sec" id="inspector"></section>
-      <section class="card sec" id="pools"></section>
       <section class="card sec" id="wip"></section>
+      <section class="card sec" id="mons"></section>
+      <section class="card sec" id="pools"></section>
     </aside>
   </div>
 
@@ -224,24 +244,48 @@ code{font-family:var(--f-mono);font-size:12px}
 
   <section class="notes">
     <div class="card">
-      <h4>iQuery and big3d</h4>
+      <h4>Split DNS</h4>
       <ul>
-        <li>iQuery is XML over TCP port 4353, wrapped in TLS. Trust comes from device certificates exchanged with <code>bigip_add</code> or <code>big3d_install</code>.</li>
-        <li>gtmd on every DNS device opens a connection to big3d on every BIG-IP server it knows, including itself and its sync-group peers. Two DNS devices and two LTMs make 8 connections.</li>
-        <li>big3d sends each result to every gtmd connected to it. A gtmd that loses its connection stops hearing that big3d, so two DNS devices can disagree.</li>
+        <li>BIND has two views. Resolvers in <code>10.0.0.0/8</code> get the <code>internal</code> view, everyone else <code>external</code>. Both CNAME the apps into gtm.chala.info, but the delegation points to the listeners' internal or public (NATed) addresses.</li>
+        <li>On BIG-IP DNS each wide IP has two pools. The wide IP uses Topology: an LDNS in region <code>internal_nets</code> scores pool <code>_int</code> (10.x answers), any other LDNS scores pool <code>_ext</code> (public answers).</li>
+        <li>External virtual server objects use a translation address, so gtmd answers the public address while big3d still monitors the private one.</li>
       </ul>
     </div>
     <div class="card">
-      <h4>Probers and prober pools</h4>
+      <h4>Delegating to BIG-IP DNS</h4>
       <ul>
-        <li>The <code>bigip</code> monitor needs no prober. The LTM's own big3d reports its virtual server status.</li>
-        <li>Other monitors (http, tcp, gateway_icmp) need a big3d to send the probe. The server's prober preference picks it, then the fallback if the preference has no available prober.</li>
-        <li>A prober pool is an ordered list of BIG-IP servers. Round Robin spreads monitor instances across members. Global Availability gives them all to the first available member.</li>
+        <li>BIND stays authoritative for <code>chala.info</code>. Each app name is a CNAME: <code>app1.chala.info → app1.gtm.chala.info</code>.</li>
+        <li><code>gtm.chala.info</code> is delegated with NS records to the BIG-IP DNS listeners, so a resolver following the CNAME asks gtmd, which answers from the wide IP.</li>
+        <li>The resolver caches each piece for its own TTL: BIND's CNAME and NS for hours, gtmd's A record for the pool TTL (30 s by default), so GSLB decisions are picked up quickly.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>GSLB on BIG-IP DNS</h4>
+      <ul>
+        <li>A wide IP (<code>app1.gtm.chala.info</code>) points to a GTM pool. Its members are virtual servers on server objects: BIG-IP LTMs or generic hosts.</li>
+        <li>gtmd picks an available member with the pool's load balancing mode. Round Robin alternates. Global Availability uses the first available member in order. Round Trip Times picks the data center closest to the LDNS, using the alternate mode until path metrics exist.</li>
+        <li>If no member is available, the fallback mode applies (<code>return-to-dns</code> here).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Monitors, probers and generic hosts</h4>
+      <ul>
+        <li><code>bigip</code> sends no probe. The LTM's big3d reports the status of its own virtual servers to every connected gtmd.</li>
+        <li>Custom monitors (http, https, tcp, gateway_icmp) need a prober: a big3d chosen by the server's prober preference, then its fallback. It probes the member and sends the result to every connected gtmd.</li>
+        <li>A generic host runs no big3d, so it has no iQuery connection and can't use bigip. Everything gtmd knows about it comes from probes sent by BIG-IP big3d agents.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>iQuery and big3d</h4>
+      <ul>
+        <li>iQuery is XML over TCP port 4353, wrapped in TLS. Trust comes from device certificates exchanged with <code>bigip_add</code> or <code>big3d_install</code>.</li>
+        <li>gtmd on every DNS device connects to big3d on every BIG-IP server it knows, itself included: 8 connections here.</li>
+        <li>A gtmd that loses its connection to a big3d stops hearing that big3d's results, so two DNS devices can disagree.</li>
       </ul>
     </div>
     <div class="card">
       <h4>About this model</h4>
-      <p>Timing is compressed: one real second is 5 simulated seconds at 1×. Monitor defaults follow BIG-IP DNS (bigip 30 s / 90 s, http 30 s / 120 s). Log lines and iQuery XML are modeled on real <code>/var/log/gtm</code> and <code>iqdump</code> output but simplified, so check a real device for exact message text. Real CLI to try: <code>tmsh show gtm iquery</code>, <code>iqdump 10.1.10.10</code>, <code>tmsh list gtm prober-pool</code>, <code>tmsh show gtm path</code>.</p>
+      <p>1× is real time and uses BIG-IP defaults: iQuery heartbeat 10 s, bigip monitor 30 s / 90 s, custom monitors 30 s / 120 s, path TTL 2400 s, pool TTL 30 s. Use 5× to 20× to skip ahead. Packets in flight are slowed down so you can see them; real iQuery and DNS messages take milliseconds. The LDNS is assumed to already know where chala.info lives, so root and .info lookups are skipped. Internal and external virtual server objects share one status per real server here; on a real system each is monitored separately. Log lines, iQuery XML and the config tabs are modeled on real output but simplified, so check a real device for exact text. Real CLI to try: <code>tmsh show gtm iquery</code>, <code>tmsh show gtm pool a</code>, <code>dig app1.chala.info +trace</code>, <code>iqdump 10.1.10.10</code>.</p>
     </div>
   </section>
 </div>
@@ -249,78 +293,112 @@ code{font-family:var(--f-mono);font-size:12px}
 <script>
 (() => {
 "use strict";
-const SIM_RATE = 5, PATH_TTL = 2400;
+const SIM_RATE = 1, PATH_TTL = 2400, BIND_TTL = 3600, POOL_TTL = 30;
 const BASE = new Date(2026, 9, 27, 14, 2, 0).getTime();
 const $ = s => document.querySelector(s);
 const NS = "http://www.w3.org/2000/svg";
 const GTMS = ["gtm-nyc", "gtm-sea"];
 const BIGIPS = ["ltm-nyc", "gtm-nyc", "gtm-sea", "ltm-sea"];
-const GENERIC = ["app-nyc-01", "app-nyc-02", "app-sea-01"];
+const LTMS = ["ltm-nyc", "ltm-sea"];
+const GENS = ["gen-nyc-01", "gen-sea-01"];
+const PREF_SERVERS = [...LTMS, ...GENS];
 const LDNS = ["ldns-a", "ldns-b"];
-const SPEEDS = [0.5, 1, 2, 4, 8];
+const LTM_APPS = ["app1", "app2", "app3"];
+const WKEYS = [...LTM_APPS, "app4"];
+const VSS = ["nyc", "sea"].flatMap(dc => LTM_APPS.map(w => `vs_${w}_${dc}`));
+const MEMBERS = [...VSS, ...GENS];
+const SPEEDS = [1, 2, 5, 10, 20];
 const TYPES = {
   iq: "iQuery keepalive / control",
-  result: "Monitor result (big3d → gtmd)",
-  probe: "Monitor probe",
+  result: "Status / monitor result (big3d → gtmd)",
+  probe: "Custom monitor probe",
   path: "Path probe to LDNS",
   dns: "DNS query / answer",
 };
-const PID = { "gtm-nyc": { gtmd: 8123, big3d: 5120 }, "gtm-sea": { gtmd: 8240, big3d: 5177 }, "ltm-nyc": { big3d: 4471, tmm: 9001 }, "ltm-sea": { big3d: 4502, tmm: 9010 } };
+const PID = { "gtm-nyc": { gtmd: 8123, big3d: 5120, mcpd: 6011 }, "gtm-sea": { gtmd: 8240, big3d: 5177, mcpd: 6034 }, "ltm-nyc": { big3d: 4471, tmm: 9001 }, "ltm-sea": { big3d: 4502, tmm: 9010 }, bind: { named: 1187 } };
 const RULES = { inherit: "Inherit from data center", inside: "Inside Data Center", outside: "Outside Data Center", any: "Any Available", none: "None", "pool:pp_east": "Prober pool pp_east", "pool:pp_west": "Prober pool pp_west" };
 const PREF_OPTS = ["inside", "outside", "pool:pp_east", "pool:pp_west"];
 const FB_OPTS = ["any", "inside", "outside", "none", "pool:pp_east", "pool:pp_west"];
 const COLOR = { up: "green", down: "red", unknown: "blue" };
 const DOTC = { up: "g", down: "r", unknown: "b" };
+const METHODS = { rr: "Round Robin", ga: "Global Availability", rtt: "Round Trip Times" };
+const TMSH_LB = { rr: "round-robin", ga: "global-availability", rtt: "round-trip-time" };
+const MTYPES = { http: "HTTP", https: "HTTPS", tcp: "TCP", gateway_icmp: "Gateway ICMP" };
+const SEND_DEF = (host, path = "/health") => `GET ${path} HTTP/1.1\\r\\nHost: ${host}\\r\\nConnection: Close\\r\\n\\r\\n`;
+const draftFor = type => ({ name: "", type, send: type === "http" || type === "https" ? SEND_DEF("app2.chala.info") : "", recv: type === "http" || type === "https" ? "200 OK" : "", interval: 30, timeout: 120 });
+const fqdn = wk => `${wk}.chala.info`;
+const INTERNAL_NET = "10.0.0.0/8";
+/* split DNS: resolvers in 10/8 get BIND's internal view and gtmd's _int pools */
+const isInt = ldns => !!N[ldns].internal;
+const viewOf = ldns => isInt(ldns) ? "internal" : "external";
+const poolFor = (W, ldns) => `${W.pool}_${isInt(ldns) ? "int" : "ext"}`;
+const addrFor = (m, ldns) => isInt(ldns) ? m.ip : m.pub;
+const lsnr = (g, ldns) => isInt(ldns) ? N[g].listener : N[g].pub;
+const ldnsName = id => `LDNS ${id.slice(-1).toUpperCase()} (${N[id].internal ? "internal" : "ISP"})`;
 
-let S = { speed: 1, playing: true, viewGtm: "gtm-nyc", sel: { k: "node", id: "gtm-nyc" }, tab: "log", show: { iq: true, result: true, probe: true, path: true, dns: true }, iqd: "gtm-sea>ltm-nyc", dnsOn: true, scen: "baseline" };
-let N, DC, POOLS, WIP, MEM, CONN, VIEW, PATHS, PENDING, TIMERS, LOGS, DNSLOG, PK, FL, RR;
+let S = { speed: 1, playing: false, started: false, viewGtm: "gtm-nyc", sel: { k: "node", id: "client-a" }, tab: "log", show: { iq: true, result: true, probe: true, path: true, dns: true }, iqd: "gtm-sea>ltm-nyc", dnsOn: true, scen: "dns", draft: draftFor("http"), err: "" };
+let N, DC, POOLS, WIPS, MONS, INST, CONN, VIEW, PATHS, PENDING, CACHE, TIMERS, LOGS, DNSLOG, PK, FL, RR, HINT = null;
 
 /* ---------- state ---------- */
 function fresh() {
   N = {
-    "ltm-nyc": { id: "ltm-nyc", kind: "bigip", dns: false, dc: "nyc", ip: "10.1.10.10", x: 130, y: 250, up: true, big3d: true, model: "BIG-IP LTM" },
-    "gtm-nyc": { id: "gtm-nyc", kind: "bigip", dns: true, dc: "nyc", ip: "10.1.10.5", listener: "10.1.10.53", x: 360, y: 250, up: true, big3d: true, model: "BIG-IP DNS" },
-    "gtm-sea": { id: "gtm-sea", kind: "bigip", dns: true, dc: "sea", ip: "10.2.10.5", listener: "10.2.10.53", x: 640, y: 250, up: true, big3d: true, model: "BIG-IP DNS" },
-    "ltm-sea": { id: "ltm-sea", kind: "bigip", dns: false, dc: "sea", ip: "10.2.10.10", x: 870, y: 250, up: true, big3d: true, model: "BIG-IP LTM" },
-    "app-nyc-01": { id: "app-nyc-01", kind: "generic", dc: "nyc", ip: "10.1.30.11", x: 160, y: 470, up: true, pref: "inherit", fb: "inherit" },
-    "app-nyc-02": { id: "app-nyc-02", kind: "generic", dc: "nyc", ip: "10.1.30.12", x: 345, y: 470, up: true, pref: "inherit", fb: "inherit" },
-    "app-sea-01": { id: "app-sea-01", kind: "generic", dc: "sea", ip: "10.2.30.11", x: 760, y: 470, up: true, pref: "inherit", fb: "inherit" },
-    "ldns-a": { id: "ldns-a", kind: "ldns", ip: "198.51.100.53", x: 300, y: 80, rtt: { nyc: 21, sea: 74 }, client: "client-a" },
-    "ldns-b": { id: "ldns-b", kind: "ldns", ip: "203.0.113.53", x: 700, y: 80, rtt: { nyc: 69, sea: 17 }, client: "client-b" },
-    "client-a": { id: "client-a", kind: "client", ip: "198.51.100.77", x: 95, y: 80 },
-    "client-b": { id: "client-b", kind: "client", ip: "203.0.113.140", x: 905, y: 80 },
+    "ltm-nyc": { id: "ltm-nyc", kind: "bigip", dns: false, dc: "nyc", ip: "10.1.10.10", x: 130, y: 250, up: true, big3d: true, model: "BIG-IP LTM", pref: "inherit", fb: "inherit", nextBig: 4 },
+    "gtm-nyc": { id: "gtm-nyc", kind: "bigip", dns: true, dc: "nyc", ip: "10.1.10.5", listener: "10.1.10.53", pub: "203.0.113.53", x: 360, y: 250, up: true, big3d: true, model: "BIG-IP DNS" },
+    "gtm-sea": { id: "gtm-sea", kind: "bigip", dns: true, dc: "sea", ip: "10.2.10.5", listener: "10.2.10.53", pub: "203.0.113.153", x: 640, y: 250, up: true, big3d: true, model: "BIG-IP DNS" },
+    "ltm-sea": { id: "ltm-sea", kind: "bigip", dns: false, dc: "sea", ip: "10.2.10.10", x: 870, y: 250, up: true, big3d: true, model: "BIG-IP LTM", pref: "inherit", fb: "inherit", nextBig: 5.5 },
+    "ldns-a": { id: "ldns-a", kind: "ldns", internal: true, ip: "10.0.0.53", x: 300, y: 90, rtt: { nyc: 4, sea: 66 }, client: "client-a" },
+    "bind": { id: "bind", kind: "bind", ip: "192.0.2.53", x: 500, y: 90, up: true },
+    "ldns-b": { id: "ldns-b", kind: "ldns", internal: false, ip: "198.51.100.53", x: 760, y: 90, rtt: { nyc: 69, sea: 17 }, client: "client-b" },
+    "client-a": { id: "client-a", kind: "client", ip: "10.0.5.77", x: 95, y: 90 },
+    "client-b": { id: "client-b", kind: "client", ip: "198.51.100.140", x: 920, y: 90 },
+    "gen-nyc-01": { id: "gen-nyc-01", kind: "generic", server: "gen-nyc-01", vsName: "app4_web", dc: "nyc", wip: "app4", ip: "10.1.30.11", pub: "203.0.113.40", port: 80, x: 360, y: 430, up: true, vsUp: true, appOk: true, pref: "pool:pp_east", fb: "inherit" },
+    "gen-sea-01": { id: "gen-sea-01", kind: "generic", server: "gen-sea-01", vsName: "app4_web", dc: "sea", wip: "app4", ip: "10.2.30.11", pub: "203.0.113.140", port: 80, x: 640, y: 430, up: true, vsUp: true, appOk: true, pref: "pool:pp_west", fb: "inherit" },
   };
-  DC = { nyc: { name: "dc_nyc", city: "New York", pref: "pool:pp_east", fb: "outside" }, sea: { name: "dc_sea", city: "Seattle", pref: "inside", fb: "any" } };
+  LTM_APPS.forEach((w, i) => {
+    for (const dc of ["nyc", "sea"]) {
+      const ltm = "ltm-" + dc, id = `vs_${w}_${dc}`;
+      N[id] = { id, kind: "vs", server: ltm, vsName: id, dc, wip: w, ip: `10.${dc === "nyc" ? 1 : 2}.20.${(i + 1) * 10}`, pub: `203.0.113.${(dc === "nyc" ? 0 : 100) + (i + 1) * 10}`, port: 443, x: N[ltm].x, y: 345 + i * 55, vsUp: true, appOk: true };
+    }
+  });
+  DC = { nyc: { name: "dc_nyc", city: "New York", pref: "inside", fb: "any" }, sea: { name: "dc_sea", city: "Seattle", pref: "inside", fb: "any" } };
   POOLS = {
     pp_east: { name: "pp_east", method: "rr", members: [{ id: "gtm-nyc", en: true }, { id: "ltm-nyc", en: true }], rr: 0 },
     pp_west: { name: "pp_west", method: "ga", members: [{ id: "ltm-sea", en: true }, { id: "gtm-sea", en: true }], rr: 0 },
   };
-  WIP = { name: "www.example.com", pool: "pool_web", method: "rr", rr: { "gtm-nyc": 0, "gtm-sea": 1 } };
-  MEM = [
-    { id: "vs_web_nyc", name: "/Common/vs_web_nyc", server: "ltm-nyc", ip: "10.1.20.100", port: 443, mon: "bigip", interval: 30, timeout: 90, dc: "nyc", vsUp: true, next: 4 },
-    { id: "vs_web_sea", name: "/Common/vs_web_sea", server: "ltm-sea", ip: "10.2.20.100", port: 443, mon: "bigip", interval: 30, timeout: 90, dc: "sea", vsUp: true, next: 5.5 },
-    { id: "app_nyc_01", name: "/Common/app-nyc-01:80", server: "app-nyc-01", ip: "10.1.30.11", port: 80, mon: "http", interval: 30, timeout: 120, dc: "nyc", next: 7 },
-    { id: "app_nyc_02", name: "/Common/app-nyc-02:80", server: "app-nyc-02", ip: "10.1.30.12", port: 80, mon: "http", interval: 30, timeout: 120, dc: "nyc", next: 9 },
-    { id: "app_sea_01", name: "/Common/app-sea-01:80", server: "app-sea-01", ip: "10.2.30.11", port: 80, mon: "http", interval: 30, timeout: 120, dc: "sea", next: 11 },
-  ];
+  MONS = {
+    bigip: { name: "bigip", type: "bigip", builtin: true, interval: 30, timeout: 90 },
+    http_app4: { name: "http_app4", type: "http", builtin: false, interval: 30, timeout: 120, send: SEND_DEF("app4.chala.info", "/"), recv: "200 OK" },
+  };
+  WIPS = {};
+  for (const [w, method] of [["app1", "rr"], ["app2", "ga"], ["app3", "rtt"], ["app4", "ga"]]) {
+    const generic = w === "app4";
+    WIPS[w] = { name: `${w}.gtm.chala.info`, pool: `pool_${w}`, method, generic, mons: generic ? ["http_app4"] : ["bigip"], members: generic ? GENS : [`vs_${w}_nyc`, `vs_${w}_sea`], rr: { "gtm-nyc": 0, "gtm-sea": 1 } };
+  }
+  INST = [];
   CONN = {};
   let i = 0;
   for (const g of GTMS) for (const b of BIGIPS) {
     CONN[g + ">" + b] = { key: g + ">" + b, g, b, st: "down", cert: false, rec: 0, bin: 0, bout: 0, retry: 0.3 + i * 0.3, hb: 4 + i * 1.1, msgs: [], everUp: false, lostReason: "" };
     i++;
   }
-  VIEW = {}; PATHS = {};
-  for (const g of GTMS) { VIEW[g] = {}; PATHS[g] = { "ldns-a": {}, "ldns-b": {} }; for (const m of MEM) VIEW[g][m.id] = { st: "unknown", lastOk: 0, why: "Checking", from: "" }; }
+  VIEW = {}; PATHS = {}; CACHE = {};
+  for (const g of GTMS) { VIEW[g] = {}; PATHS[g] = { "ldns-a": {}, "ldns-b": {} }; }
+  for (const l of LDNS) CACHE[l] = { ns: 0, cname: {}, a: {} };
   PENDING = {}; TIMERS = []; LOGS = []; DNSLOG = []; PK = []; FL = []; RR = {};
-  S.now = 0; S.nextSec = 0; S.nextDns = 5; S.wan = true;
+  S.now = 0; S.nextSec = 0; S.nextDns = 5; S.wan = true; S.dnsOn = true; S.guiding = false;
+  HINT = null;
+  const pop = $("#hintPop"); if (pop) pop.hidden = true;
   const g = $("#pk"); if (g) g.innerHTML = "";
   const f = $("#fl"); if (f) f.innerHTML = "";
 }
 
 /* ---------- helpers ---------- */
-const mem = id => MEM.find(m => m.id === id);
 const conn = (g, b) => CONN[g + ">" + b];
 const reach = (a, b) => { const A = N[a], B = N[b]; if (!A.dc || !B.dc) return true; return A.dc === B.dc || S.wan; };
+const isWeb = m => m.type === "http" || m.type === "https";
+const effMons = W => W.mons.length ? W.mons : W.generic ? [] : ["bigip"];
+const instOf = vs => INST.filter(i => i.vs === vs);
+function monRule(W) { return W.mons.length ? W.mons.map(m => "/Common/" + m).join(" and ") : W.generic ? "none (status stays unknown, still answered)" : "none (members use the server monitor /Common/bigip)"; }
 function proberOk(id) { const n = N[id]; return n.up && n.big3d && GTMS.some(g => N[g].up && conn(g, id).st === "connected"); }
 function eff(h) { const n = N[h]; return { pref: n.pref === "inherit" ? DC[n.dc].pref : n.pref, fb: n.fb === "inherit" ? DC[n.dc].fb : n.fb }; }
 function ts(t) { const d = new Date(BASE + t * 1000); const mo = d.toLocaleString("en-US", { month: "short" }); const p = n => String(n).padStart(2, "0"); return `${mo} ${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
@@ -328,6 +406,25 @@ function log(host, sev, proc, msg, code) { LOGS.unshift({ t: S.now, host, sev, p
 function addTimer(d, fn) { TIMERS.push({ t: S.now + d, fn }); }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const fmtBits = b => b > 1e6 ? (b / 1e6).toFixed(1) + "M" : b > 1e3 ? (b / 1e3).toFixed(1) + "K" : String(b);
+
+/* monitor instances: one per pool member per monitor on its pool */
+function syncInst() {
+  const old = new Map(INST.map(i => [i.key, i])), want = [];
+  for (const W of Object.values(WIPS)) for (const vs of W.members) for (const mn of effMons(W)) want.push(vs + "|" + mn);
+  INST = want.map((key, k) => old.get(key) || newInst(key, k));
+}
+function newInst(key, k) {
+  const [vs, mon] = key.split("|");
+  for (const g of GTMS) VIEW[g][key] = { st: "unknown", lastOk: S.now, why: "Checking", from: "", lastFail: "" };
+  return { key, vs, mon, next: Math.max(S.now + 1, 6) + (k % 6) * 1.3, prober: null, rule: null, selWhy: "", last: "" };
+}
+/* availability requirement: all monitors must pass */
+function memberSt(g, vs) {
+  const sts = instOf(vs).map(i => VIEW[g][i.key].st);
+  if (sts.includes("down")) return { st: "down", avail: false };
+  if (sts.length && sts.every(s => s === "up")) return { st: "up", avail: true };
+  return { st: "unknown", avail: true };
+}
 
 function connGeom(c) {
   const a = N[c.g], b = N[c.b];
@@ -349,7 +446,7 @@ function spawn(from, to, type, o = {}) {
   const geom = o.geom || { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
   const dist = Math.hypot(geom.x2 - geom.x1, geom.y2 - geom.y1);
   const drop = o.drop ?? !reach(from, to);
-  PK.push({ type, geom, t0: S.now, dur: 1.6 + dist / 260, drop, label: o.label || "", onArrive: o.onArrive, el: null });
+  PK.push({ type, geom, t0: S.now, dur: 0.9 + dist / 450, drop, label: o.label || "", onArrive: o.onArrive, el: null });
 }
 function flash(x, y, cls) { FL.push({ x, y, cls, t0: S.now, el: null }); }
 function iqGeom(c, reverse) { const g = connGeom(c); return reverse ? { x1: g.x2, y1: g.y2, cx: g.cx, cy: g.cy, x2: g.x1, y2: g.y1 } : g; }
@@ -420,27 +517,27 @@ function heartbeats() {
 }
 
 /* ---------- monitor views ---------- */
-function setView(g, m, st, from, why) {
-  const v = VIEW[g][m.id], prev = v.st;
+function setView(g, i, st, from, why) {
+  const v = VIEW[g][i.key], prev = v.st, vs = N[i.vs];
+  const before = memberSt(g, i.vs).st;
   v.why = why; v.from = from;
-  if (st === "up") v.lastOk = S.now;
+  if (st === "up") { v.lastOk = S.now; v.lastFail = ""; }
   if (prev === st) return;
   v.st = st;
-  if (m.mon === "bigip") {
-    log(g, "alert", "gtmd", `SNMP_TRAP: VS ${m.name} (ip:port=${m.ip}:${m.port}) (Server /Common/${m.server}) state change ${COLOR[prev]} --> ${COLOR[st]} ( Monitor /Common/bigip from ${from || N[g].ip} : ${why})`, "011a6006:1");
-  } else {
-    log(g, "alert", "gtmd", `Monitor instance /Common/http ${m.ip}:${m.port} ${prev.toUpperCase()} --> ${st.toUpperCase()} from ${from || N[g].ip} (${why})`, "011ae0f2:1");
-  }
+  if (i.mon !== "bigip") log(g, "alert", "gtmd", `Monitor instance /Common/${i.mon} ${vs.ip}:${vs.port} ${prev.toUpperCase()} --> ${st.toUpperCase()} from ${from || N[g].ip} (${why})`, "011ae0f2:1");
+  const after = memberSt(g, i.vs).st;
+  if (before !== after) log(g, "alert", "gtmd", `SNMP_TRAP: VS /Common/${vs.vsName} (ip:port=${vs.ip}:${vs.port}) (Server /Common/${vs.server}) state change ${COLOR[before]} --> ${COLOR[after]} ( Monitor /Common/${i.mon} from ${from || N[g].ip} : ${why})`, "011a6006:1");
 }
 function checkTimeouts() {
   for (const g of GTMS) {
     if (!N[g].up) continue;
-    for (const m of MEM) {
-      const v = VIEW[g][m.id];
+    for (const i of INST) {
+      const v = VIEW[g][i.key], m = MONS[i.mon];
       if (v.st === "down" || v.noProber) continue;
       if (S.now - v.lastOk > m.timeout) {
-        const why = m.mon === "bigip" ? `state: no update from big3d on ${m.server} in ${m.timeout}s` : `state: timeout, no reply in ${m.timeout}s`;
-        setView(g, m, "down", m.mon === "bigip" ? N[m.server].ip : (m.prober ? N[m.prober].ip : ""), why);
+        const server = N[i.vs].server;
+        const why = m.type === "bigip" ? `state: no update from big3d on ${server} in ${m.timeout}s` : v.lastFail ? `state: ${v.lastFail}; no successful probe in ${m.timeout}s` : `state: timeout, no reply in ${m.timeout}s`;
+        setView(g, i, "down", m.type === "bigip" ? N[server].ip : (i.prober ? N[i.prober].ip : ""), why);
       }
     }
   }
@@ -455,8 +552,8 @@ function cands(rule, dc) {
   if (rule === "outside") list = list.filter(id => N[id].dc !== dc);
   return list.filter(proberOk);
 }
-function selectProber(m) {
-  const h = N[m.server], e = eff(m.server);
+function selectProber(i) {
+  const h = N[N[i.vs].server], e = eff(h.id);
   let rule = e.pref, stage = "Preference", c = cands(rule, h.dc);
   if (!c.length) { rule = e.fb; stage = "Fallback"; c = cands(rule, h.dc); }
   if (!c.length) return { id: null, why: `No prober: ${RULES[e.pref]} and fallback ${RULES[e.fb]} are both empty` };
@@ -464,55 +561,87 @@ function selectProber(m) {
   let id, how = "";
   if (pool && pool.method === "ga") { id = c[0]; how = " · Global Availability"; }
   else {
-    if (m.prober && c.includes(m.prober) && m.rule === rule) id = m.prober;
+    if (i.prober && c.includes(i.prober) && i.rule === rule) id = i.prober;
     else { const k = pool ? null : rule + h.dc; const ctr = pool || (RR[k] = RR[k] || { rr: 0 }); id = c[ctr.rr++ % c.length]; }
     if (pool) how = " · Round Robin";
   }
-  m.rule = rule;
+  i.rule = rule;
   return { id, why: `${stage}: ${RULES[rule]}${how}` };
 }
-function reassignAll() { for (const m of MEM) { m.prober = null; m.rule = null; } for (const p of Object.values(POOLS)) p.rr = 0; RR = {}; }
+function reassignAll() { for (const i of INST) { i.prober = null; i.rule = null; } for (const p of Object.values(POOLS)) p.rr = 0; RR = {}; }
 
 /* ---------- monitors ---------- */
-function runBigip(m) {
-  const ltm = N[m.server];
+/* bigip: no probe. The LTM's big3d reports all its virtual servers to every connected gtmd. */
+function runBigip(ltmId) {
+  const ltm = N[ltmId];
   if (!ltm.up || !ltm.big3d) return;
+  const vss = VSS.filter(v => N[v].server === ltmId);
   for (const g of GTMS) {
-    const c = conn(g, m.server);
+    const c = conn(g, ltmId);
     if (c.st !== "connected") continue;
-    sendIq(c, "result", `<vip_status>\n  <server>/Common/${m.server}</server>\n  <name>${m.name}</name>\n  <ip>${m.ip}</ip><port>${m.port}</port>\n  <state>${m.vsUp ? "green" : "red"}</state>\n  <monitor>/Common/bigip</monitor>\n</vip_status>`,
-      () => setView(g, m, m.vsUp ? "up" : "down", ltm.ip, m.vsUp ? "state: OK" : "state: VS reports no available pool members"));
+    sendIq(c, "result", `<vip_status_list>\n  <server>/Common/${ltmId}</server>\n${vss.map(v => `  <vip><name>/Common/${v}</name><ip>${N[v].ip}</ip><port>${N[v].port}</port><state>${N[v].vsUp ? "green" : "red"}</state></vip>`).join("\n")}\n</vip_status_list>`, () => {
+      for (const v of vss) {
+        const i = INST.find(x => x.key === v + "|bigip");
+        if (i) setView(g, i, N[v].vsUp ? "up" : "down", ltm.ip, N[v].vsUp ? "state: OK" : "state: VS reports no available pool members");
+      }
+    });
   }
 }
-function runHttp(m) {
-  const host = N[m.server];
-  const sel = selectProber(m);
-  const prev = m.prober;
-  m.prober = sel.id; m.selWhy = sel.why;
+function reqLabel(m) {
+  if (m.type === "tcp") return "SYN";
+  if (m.type === "gateway_icmp") return "ICMP echo";
+  const line = (m.send || "").split("\\r\\n")[0].replace(/\s+HTTP\/1\.[01]$/, "") || "GET /";
+  return (m.type === "https" ? "TLS · " : "") + line;
+}
+/* what the member (LTM virtual server or generic host) sends back to a probe */
+function respond(vs, m) {
+  if (!N[vs.server].up) return { ok: false, reply: "", why: "no reply (BIG-IP powered off)" };
+  if (m.type === "gateway_icmp") return { ok: true, reply: "echo reply", why: "ICMP echo reply" };
+  if (!vs.vsUp) return { ok: false, reply: "RST", why: vs.kind === "generic" ? "connection refused (RST), web service stopped" : "connection reset, virtual server has no available pool members" };
+  if (m.type === "tcp") return { ok: true, reply: "SYN-ACK", why: "TCP connection established" };
+  const status = vs.appOk ? "HTTP/1.1 200 OK" : "HTTP/1.1 503 Service Unavailable";
+  const body = vs.appOk ? `{"status":"up"}` : "<h1>Down for maintenance</h1>";
+  const ok = !m.recv || `${status}\r\n\r\n${body}`.includes(m.recv);
+  return { ok, reply: vs.appOk ? "200 OK" : "503", why: !m.recv ? `${status}, no receive string so any reply passes` : ok ? `${status}, receive string "${m.recv}" matched` : `${status}, receive string "${m.recv}" not found` };
+}
+function runCustom(i) {
+  const m = MONS[i.mon], vs = N[i.vs], name = `/Common/${m.name} ${vs.ip}:${vs.port}`;
+  const sel = selectProber(i), prev = i.prober;
+  i.prober = sel.id; i.selWhy = sel.why;
+  const lg = GTMS.find(g => N[g].up) || "gtm-nyc";
   if (!sel.id) {
-    if (!m.noProberLogged) log(GTMS.find(g => N[g].up) || "gtm-nyc", "warning", "gtmd", `No prober available for monitor instance /Common/http ${m.ip}:${m.port} on server /Common/${m.server} (${RULES[eff(m.server).pref]}, fallback ${RULES[eff(m.server).fb]})`);
-    m.noProberLogged = true;
-    for (const g of GTMS) if (N[g].up) { const v = VIEW[g][m.id]; v.noProber = true; setView(g, m, "unknown", "", "no prober available"); }
+    if (!i.noProberLogged) log(lg, "warning", "gtmd", `No prober available for monitor instance ${name} on server /Common/${vs.server} (${RULES[eff(vs.server).pref]}, fallback ${RULES[eff(vs.server).fb]})`);
+    i.noProberLogged = true;
+    for (const g of GTMS) if (N[g].up) { VIEW[g][i.key].noProber = true; setView(g, i, "unknown", "", "no prober available"); }
     return;
   }
-  m.noProberLogged = false;
-  for (const g of GTMS) VIEW[g][m.id].noProber = false;
-  if (prev && prev !== sel.id) log(GTMS.find(g => N[g].up) || "gtm-nyc", "info", "gtmd", `Monitor instance /Common/http ${m.ip}:${m.port} reassigned from ${N[prev].ip} (${prev}) to ${N[sel.id].ip} (${sel.id}) [${sel.why}]`);
+  i.noProberLogged = false;
+  for (const g of GTMS) VIEW[g][i.key].noProber = false;
+  if (prev && prev !== sel.id) log(lg, "info", "gtmd", `Monitor instance ${name} reassigned from ${N[prev].ip} (${prev}) to ${N[sel.id].ip} (${sel.id}) [${sel.why}]`);
   const p = sel.id;
-  m.lastProbe = S.now;
-  spawn(p, host.id, "probe", { label: "GET /", onArrive: () => {
-    if (!host.up) { flash(host.x, host.y, "r"); m.lastResult = "no reply"; return; }
-    spawn(host.id, p, "probe", { label: "200 OK", onArrive: () => {
-      if (!N[p].up || !N[p].big3d) return;
-      m.lastResult = "200 OK";
-      for (const g of GTMS) {
-        const c = conn(g, p);
-        if (c.st !== "connected") continue;
-        sendIq(c, "result", `<monitor_result>\n  <monitor>/Common/http</monitor>\n  <ip>${m.ip}</ip><port>${m.port}</port>\n  <prober>${N[p].ip}</prober>\n  <state>up</state>\n  <rtt_ms>${2 + Math.floor(Math.random() * 6)}</rtt_ms>\n</monitor_result>`,
-          () => setView(g, m, "up", N[p].ip, "state: OK"));
-      }
-    } });
+  spawn(p, vs.id, "probe", { label: reqLabel(m), onArrive: () => {
+    const r = respond(vs, m);
+    if (!r.reply) { flash(vs.x, vs.y, "r"); addTimer(3, () => report(p, i, r)); return; }
+    spawn(vs.id, p, "probe", { label: r.reply, onArrive: () => report(p, i, r) });
   } });
+}
+/* the prober's big3d sends the result to every gtmd connected to it */
+function report(p, i, r) {
+  const m = MONS[i.mon];
+  if (!m || !N[p].up || !N[p].big3d) return;
+  const vs = N[i.vs];
+  i.last = r.why;
+  for (const g of GTMS) {
+    const c = conn(g, p);
+    if (c.st !== "connected") continue;
+    sendIq(c, "result", `<monitor_result>\n  <monitor>/Common/${m.name}</monitor>\n  <ip>${vs.ip}</ip><port>${vs.port}</port>\n  <prober>${N[p].ip}</prober>\n  <state>${r.ok ? "up" : "down"}</state>\n  <detail>${r.why}</detail>\n</monitor_result>`, () => {
+      if (!INST.includes(i)) return;
+      if (r.ok) { setView(g, i, "up", N[p].ip, "state: OK"); return; }
+      const v = VIEW[g][i.key];
+      v.lastFail = r.why;
+      if (v.st !== "down") v.why = `last probe: ${r.why}. Marked down if nothing succeeds within ${m.timeout} s`;
+    });
+  }
 }
 
 /* ---------- path metrics ---------- */
@@ -543,105 +672,245 @@ function requestPath(g, ldns) {
   }
 }
 
-/* ---------- DNS ---------- */
-function decide(g, ldns) {
-  const avail = MEM.filter(m => VIEW[g][m.id].st === "up");
-  if (!avail.length) return { m: null, method: "Fallback", why: "No available pool members → fallback return-to-dns" };
-  if (WIP.method === "ga") return { m: avail[0], method: "Global Availability", why: "first available member in pool order" };
-  if (WIP.method === "rtt") {
+/* ---------- DNS: client → LDNS → BIND (CNAME + referral) → BIG-IP DNS ---------- */
+function decide(g, ldns, wk) {
+  const W = WIPS[wk];
+  const avail = W.members.filter(v => memberSt(g, v).avail);
+  if (!avail.length) return { m: null, method: "Fallback", why: `no available members in ${W.pool} → fallback return-to-dns` };
+  if (W.method === "ga") return { m: avail[0], method: "Global Availability", why: avail[0] === W.members[0] ? `the first member in pool order, ${avail[0]}, is available` : `${W.members[0]} is unavailable, so the next member in order` };
+  if (W.method === "rtt") {
     const pm = PATHS[g][ldns];
-    const dcs = [...new Set(avail.map(m => m.dc))];
-    const fresh = dc => pm[dc] && S.now - pm[dc].t < PATH_TTL;
-    if (dcs.every(fresh)) {
+    const dcs = [...new Set(avail.map(v => N[v].dc))];
+    const ok = dc => pm[dc] && S.now - pm[dc].t < PATH_TTL;
+    if (dcs.every(ok)) {
       dcs.sort((a, b) => pm[a].rtt - pm[b].rtt);
-      const best = dcs[0], inDc = avail.filter(m => m.dc === best);
-      const m = inDc[(WIP.rr[g]++) % inDc.length];
-      return { m, method: "Round Trip Times", why: dcs.map(d => `${DC[d].name} ${pm[d].rtt} ms`).join(" < ") };
+      const inDc = avail.filter(v => N[v].dc === dcs[0]);
+      return { m: inDc[(W.rr[g]++) % inDc.length], method: "Round Trip Times", why: `path metrics to ${N[ldns].ip}: ${dcs.map(d => `${DC[d].name} ${pm[d].rtt} ms`).join(" < ")}` };
     }
     requestPath(g, ldns);
-    const m = avail[(WIP.rr[g]++) % avail.length];
-    return { m, method: "Round Robin (alternate)", why: `no path metrics for ${N[ldns].ip} yet; path probe requested` };
+    return { m: avail[(W.rr[g]++) % avail.length], method: "Round Robin (alternate)", why: `no path metrics for ${N[ldns].ip} yet, so the alternate method is used and big3d is asked to probe the LDNS` };
   }
-  const m = avail[(WIP.rr[g]++) % avail.length];
-  return { m, method: "Round Robin", why: `${avail.length} available member${avail.length > 1 ? "s" : ""}` };
+  return { m: avail[(W.rr[g]++) % avail.length], method: "Round Robin", why: `${avail.length} available member${avail.length > 1 ? "s" : ""}, taking turns` };
 }
-function dnsQuery(ldns) {
+const pickListener = () => GTMS[Math.random() < 0.5 ? 0 : 1];
+function dnsQuery(ldns, wk, guide, after) {
   ldns = ldns || LDNS[Math.random() < 0.5 ? 0 : 1];
-  const L = N[ldns], client = L.client;
-  spawn(client, ldns, "dns", { label: "www A?", onArrive: () => askGtm(ldns, GTMS[Math.random() < 0.5 ? 0 : 1], 0) });
+  wk = wk || WKEYS[Math.floor(Math.random() * WKEYS.length)];
+  if (guide && S.guiding) guide = false;
+  if (guide) S.guiding = true;
+  const L = N[ldns], q = { ldns, wk, guide, after: guide ? after : null, n: 0, path: [] };
+  guideStep(q, L.client, `${L.internal ? "An office client" : "A client on the internet"} (${N[L.client].ip}) looks up <b>${fqdn(wk)}</b>. Its stub resolver sends the query to ${L.internal ? "the company's internal resolver" : "its ISP's resolver"}, ${ldnsName(ldns)} at ${L.ip}.`, () =>
+    spawn(L.client, ldns, "dns", { label: `${fqdn(wk)} A?`, onArrive: () => ldnsResolve(q) }));
 }
-function askGtm(ldns, g, attempt) {
-  const L = N[ldns];
-  spawn(ldns, g, "dns", { onArrive: () => {
+function ldnsResolve(q) {
+  const C = CACHE[q.ldns], wk = q.wk, a = C.a[wk];
+  if (a && a.exp > S.now) {
+    const left = Math.ceil(a.exp - S.now);
+    q.path.push("LDNS cache");
+    guideStep(q, q.ldns, `LDNS already has the answer cached: ${fqdn(wk)} CNAME ${WIPS[wk].name}, A ${a.ip}, with ${left} s of TTL left. It answers at once, without asking BIND or BIG-IP DNS.`, () => reply(q, a.ip, a.member, { g: "—", method: "LDNS cache", why: `cached answer from ${a.g}, ${left} s TTL left` }));
+    return;
+  }
+  if (C.cname[wk] > S.now && C.ns > S.now) {
+    const g = pickListener();
+    q.path.push("cached CNAME");
+    guideStep(q, q.ldns, `LDNS still has the CNAME (${fqdn(wk)} → ${WIPS[wk].name}) and the gtm.chala.info delegation cached, but no valid A record. It skips BIND and asks a BIG-IP DNS listener, ${g} (${lsnr(g, q.ldns)}).`, () => askGtm(q, g, 0));
+    return;
+  }
+  guideStep(q, q.ldns, `LDNS has nothing cached for ${fqdn(wk)}. It sends the query to BIND (ns1.chala.info, ${N.bind.ip}), the authoritative server for chala.info.`, () => askBind(q));
+}
+function askBind(q) {
+  const wk = q.wk, view = viewOf(q.ldns), int = isInt(q.ldns);
+  q.path.push(`BIND (${view})`);
+  spawn(q.ldns, "bind", "dns", { label: `${fqdn(wk)} A?`, onArrive: () => {
+    if (!N.bind.up) { flash(N.bind.x, N.bind.y, "r"); fail(q, "SERVFAIL", "BIND (named) is not answering, so the LDNS can't learn the CNAME"); return; }
+    guideStep(q, "bind", `BIND sees the query come from ${N[q.ldns].ip}, which ${int ? `matches acl internal_nets (${INTERNAL_NET}), so it answers from the <b>internal</b> view` : `is outside ${INTERNAL_NET}, so it answers from the <b>external</b> view`}. There it finds <b>${wk} IN CNAME ${WIPS[wk].name}.</b> gtm.chala.info is delegated, so it adds a referral to the listeners' ${int ? "internal" : "public"} addresses: gtm-nyc ${lsnr("gtm-nyc", q.ldns)} and gtm-sea ${lsnr("gtm-sea", q.ldns)}.`, () =>
+      spawn("bind", q.ldns, "dns", { label: "CNAME + NS", onArrive: () => {
+        const C = CACHE[q.ldns]; C.cname[wk] = S.now + BIND_TTL; C.ns = S.now + BIND_TTL;
+        const g = pickListener();
+        guideStep(q, q.ldns, `LDNS caches the CNAME and the delegation for ${BIND_TTL} s. It follows the CNAME and asks one of the delegated listeners, ${g} at ${lsnr(g, q.ldns)}${int ? "" : `, which the ${DC[N[g].dc].name} edge firewall NATs to ${N[g].listener}`}, for <b>${WIPS[wk].name}</b>.`, () => askGtm(q, g, 0));
+      } }));
+  } });
+}
+function askGtm(q, g, attempt) {
+  const wk = q.wk, W = WIPS[wk], int = isInt(q.ldns), pool = poolFor(W, q.ldns);
+  spawn(q.ldns, g, "dns", { label: `${W.name} A?`, onArrive: () => {
     if (!N[g].up) {
       flash(N[g].x, N[g].y, "r");
-      if (attempt < 1) addTimer(2, () => askGtm(ldns, GTMS.find(x => x !== g), attempt + 1));
-      else DNSLOG.unshift({ t: S.now, ldns, g: "—", ans: "SERVFAIL", method: "—", why: "no name server answered" });
+      const other = GTMS.find(x => x !== g);
+      if (attempt < 1) guideStep(q, q.ldns, `${g} doesn't answer. LDNS times out and tries the other delegated name server, ${other}.`, () => askGtm(q, other, attempt + 1));
+      else fail(q, "SERVFAIL", "no BIG-IP DNS listener answered");
       return;
     }
-    const d = decide(g, ldns);
-    const ans = d.m ? d.m.ip : "→ BIND";
-    DNSLOG.unshift({ t: S.now, ldns, g, ans, member: d.m ? d.m.id : "", method: d.method, why: d.why, retried: attempt > 0 });
-    if (DNSLOG.length > 60) DNSLOG.pop();
-    spawn(g, ldns, "dns", { label: ans, onArrive: () => spawn(ldns, L.client, "dns", { label: ans }) });
+    q.path.push(g);
+    const d = decide(g, q.ldns, wk);
+    const topo = `Topology: LDNS ${N[q.ldns].ip} ${int ? "is in" : "is not in"} region internal_nets, so <b>${pool}</b> scores 100 and is used`;
+    const ms = W.members.map(v => `${v} ${COLOR[memberSt(g, v).st]}`).join(", ");
+    const method = `Topology → ${pool} · ${d.method}`;
+    if (!d.m) {
+      guideStep(q, g, `gtmd on ${g} matches wide IP ${W.name}. ${topo}, but none of its members is available (${ms}). The fallback mode return-to-dns hands the query to the BIG-IP's own BIND, which has no record: NXDOMAIN.`, () =>
+        spawn(g, q.ldns, "dns", { label: "NXDOMAIN", onArrive: () => fail(q, "NXDOMAIN", d.why, g, method) }));
+      return;
+    }
+    const m = N[d.m], addr = addrFor(m, q.ldns);
+    guideStep(q, g, `gtmd on ${g} is authoritative for gtm.chala.info and matches wide IP <b>${W.name}</b>. ${topo}. Members as this gtmd sees them: ${ms}. ${d.method}: ${d.why}. It answers <b>${addr}</b>, the ${int ? "internal" : `public (NAT to ${m.ip})`} address of ${d.m} in ${DC[m.dc].name}, with a ${POOL_TTL} s TTL.`, () =>
+      spawn(g, q.ldns, "dns", { label: addr, onArrive: () => {
+        CACHE[q.ldns].a[wk] = { ip: addr, member: d.m, g, exp: S.now + POOL_TTL };
+        guideStep(q, q.ldns, `LDNS caches the A record for ${POOL_TTL} s and returns the whole chain to the client: ${fqdn(wk)} CNAME ${W.name}, A ${addr}.`, () => reply(q, addr, d.m, { g, method, why: d.why }));
+      } }));
   } });
+}
+function logDns(q, ans, member, d) {
+  DNSLOG.unshift({ t: S.now, wk: q.wk, ldns: q.ldns, path: q.path.join(" → "), g: d.g, ans, member, method: d.method, why: d.why });
+  if (DNSLOG.length > 60) DNSLOG.pop();
+}
+function reply(q, ip, member, d) {
+  const L = N[q.ldns];
+  logDns(q, ip, member, d);
+  spawn(q.ldns, L.client, "dns", { label: ip, onArrive: () => {
+    const m = N[member];
+    guideStep(q, L.client, `The client now has ${fqdn(q.wk)} → ${WIPS[q.wk].name} → <b>${ip}</b> and connects to ${m.id} in ${DC[m.dc].name} at ${ip}:${m.port}${isInt(q.ldns) ? ", straight over the internal network" : `, which the edge firewall NATs to ${m.ip}`}.${q.after ? "" : ` Look the name up again within ${POOL_TTL} s from this client's panel to see the LDNS answer from its cache.`}`, null);
+  } });
+}
+function fail(q, ans, why, g = "—", method = "—") {
+  logDns(q, ans, "", { g, method, why });
+  const L = N[q.ldns];
+  spawn(q.ldns, L.client, "dns", { label: ans, onArrive: () => guideStep(q, L.client, `The client gets <b>${ans}</b>: ${why}.`, null) });
+}
+
+/* ---------- guided hints: pause at each hop until Next ---------- */
+function guideStep(q, node, html, then) {
+  if (!q.guide) { if (then) then(); return; }
+  q.n++;
+  HINT = { q, node, html, then };
+  S.playing = false; renderChrome(); showHint();
+}
+function showHint() {
+  const pop = $("#hintPop");
+  pop.innerHTML = `<div class="hs">Step ${HINT.q.n} · ${fqdn(HINT.q.wk)} · ${isInt(HINT.q.ldns) ? "internal" : "external"}</div><p>${HINT.html}</p><div class="acts"><button class="primary" data-hint="next">${HINT.then ? "Next ▸" : HINT.q.after ? "Next lookup ▸" : "Done"}</button>${HINT.then ? `<button data-hint="skip">Skip hints</button>` : ""}</div>`;
+  pop.hidden = false;
+  const wrap = $(".svgwrap");
+  if (wrap.scrollWidth > wrap.clientWidth) wrap.scrollLeft = N[HINT.node].x / 1000 * wrap.scrollWidth - wrap.clientWidth / 2;
+  positionHint(); renderSvg();
+  if (pop.classList.contains("sheet")) { const r = wrap.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight * 0.45) wrap.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  pop.querySelector("button").focus({ preventScroll: true });
+}
+function positionHint() {
+  if (!HINT) return;
+  const pop = $("#hintPop"), box = $(".svgin"), n = N[HINT.node];
+  const sheet = $(".svgwrap").clientWidth < 600;
+  pop.classList.toggle("sheet", sheet);
+  if (sheet) return;
+  const w = box.clientWidth, h = box.clientHeight, x = n.x / 1000 * w, y = n.y / 560 * h;
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  const half = (n.kind === "bigip" ? 31 : n.kind === "generic" ? 30 : 26) * h / 560;
+  const above = y - half - 12 - ph, belowTop = y + half + 12;
+  const fitsBelow = belowTop + ph <= h - 4, below = n.y < 200 || (above < 4 && fitsBelow), side = above < 4 && !fitsBelow && n.y >= 200;
+  let left = Math.max(6, Math.min(w - pw - 6, x - pw / 2)), top = below ? belowTop : above;
+  /* no room above or below: sit beside the node, on the side with more space */
+  if (side) { const hw = (n.kind === "vs" ? 84 : 70) * w / 1000 + 12; left = x > w / 2 ? x - hw - pw : x + hw; left = Math.max(6, Math.min(w - pw - 6, left)); top = Math.max(4, Math.min(h - ph - 4, y - ph / 2)); }
+  pop.style.left = left + "px";
+  pop.style.top = top + "px";
+  pop.classList.toggle("below", below && !side); pop.classList.toggle("above", !below && !side);
+  pop.style.setProperty("--ax", Math.max(14, Math.min(pw - 14, x - left)) + "px");
+}
+function closeHint(skip) {
+  const h = HINT; if (!h) return;
+  HINT = null; $("#hintPop").hidden = true;
+  if (skip) h.q.guide = false;
+  if (skip || !h.then) S.guiding = false;
+  S.playing = S.started = true; renderChrome(); renderSvg();
+  if (h.then) h.then();
+  else if (!skip && h.q.after) h.q.after();
 }
 
 /* ---------- scenarios ---------- */
+function addApp1Monitor() {
+  MONS.http_app1_health = { name: "http_app1_health", type: "http", builtin: false, interval: 30, timeout: 120, send: SEND_DEF("app1.chala.info"), recv: "200 OK" };
+  WIPS.app1.mons = ["bigip", "http_app1_health"];
+}
 const SCEN = {
+  dns: {
+    title: "DNS lookup walkthrough: internal and external",
+    text: "Split DNS for app1.chala.info. BIND answers office resolvers (10.0.0.0/8) from its internal view and everyone else from its external view. Both views CNAME app1.chala.info to app1.gtm.chala.info and delegate gtm.chala.info to BIG-IP DNS, at internal or public listener addresses. gtmd then uses Topology to pick pool_app1_int or pool_app1_ext, and Round Trip Times inside that pool. Press Start: about 18 s in, an office client looks up the name, then a client on the internet does the same. A hint pops up at every hop, and the lab pauses until you click Next.",
+    watch: ["The office lookup goes to the internal resolver, gets the internal view from BIND, and reaches gtm listeners on 10.x.", "gtmd picks pool_app1_int and New York (4 ms vs 66 ms from the office resolver), answering 10.1.20.10.", "The internet lookup gets the external view, reaches the listeners on public NATed addresses, and gtmd picks pool_app1_ext and Seattle (17 ms vs 69 ms), answering 203.0.113.110.", "Walk through it again from either client's panel. Within 30 s the LDNS answers from its cache.", "Background queries are off here. Turn them on in the Wide IPs card."],
+    sel: "client-a",
+    setup() { S.dnsOn = false; WIPS.app1.method = "rtt"; addTimer(8, () => { requestPath("gtm-nyc", "ldns-a"); requestPath("gtm-nyc", "ldns-b"); }); addTimer(18, () => dnsQuery("ldns-a", "app1", true, () => dnsQuery("ldns-b", "app1", true))); },
+  },
   baseline: {
-    title: "Healthy iQuery mesh",
-    text: "Both DNS devices boot and build the full mesh: each gtmd connects to big3d on all four BIG-IPs, 8 connections in total, including one to itself.",
-    watch: ["Members start blue (unknown) and turn green as the first results arrive.", "LTM virtual servers get their status from the LTM's big3d (bigip monitor). No prober is needed.", "Generic hosts in New York are probed by prober pool pp_east (Round Robin), so the two hosts get different probers.", "app-sea-01 uses Inside Data Center, so a Seattle BIG-IP probes it."],
+    title: "GSLB with the bigip monitor",
+    text: "Four names in chala.info are CNAMEs into gtm.chala.info, which BIND delegates to BIG-IP DNS. Office resolvers get internal answers and internet resolvers get public ones (split DNS). app1 to app3 each have a pool of two LTM virtual servers, one per data center, monitored by bigip: the LTM's own big3d reports its virtual server status to every gtmd over iQuery, so no probes are sent. app4 is served by two generic hosts and has its own scenario.",
+    watch: ["Each gtmd builds 8 iQuery connections, to big3d on all four BIG-IPs, itself included. None goes to the generic host.", "Every 30 s each LTM's big3d sends one virtual server status list (teal) to both gtmds. The members turn from blue to green.", "app1 uses Round Robin, app2 Global Availability (New York first), app3 Round Trip Times.", "The LDNS caches BIND's CNAME for 3600 s and gtmd's A record for 30 s. The DNS answers tab shows which hops each lookup took."],
     setup() {},
   },
-  ga: {
-    title: "Prober pool failover",
-    text: "pp_east is switched to Global Availability, so gtm-nyc probes both New York hosts. At 14:02:30 big3d is stopped on gtm-nyc.",
-    watch: ["Both orange prober lines start at gtm-nyc.", "When big3d stops, both gtmds lose their iQuery connection to gtm-nyc's big3d.", "The next probe for each host moves to ltm-nyc, the next pool member, before the 120 s timeout. The members stay green."],
-    fix: "Restart big3d from the gtm-nyc inspector and watch Global Availability move the probes back to member #1.",
-    setup() { POOLS.pp_east.method = "ga"; addTimer(30, () => { N["gtm-nyc"].big3d = false; log("gtm-nyc", "notice", "bigstart", "big3d stopped (bigstart stop big3d)"); render(); }); },
+  custom: {
+    title: "Add a custom HTTP monitor",
+    text: "pool_app1 now uses bigip and a custom HTTP monitor, /Common/http_app1_health, which sends GET /health to each app1 virtual server and expects 200 OK. A custom monitor needs a prober: a big3d chosen by the server's prober preference, here Inside Data Center.",
+    watch: ["Orange GET /health probes go from a BIG-IP in the same data center to each app1 virtual server, and 200 OK comes back.", "The prober's big3d sends the result to both gtmds (teal). The probe is sent once, but every gtmd learns the result.", "Dashed orange lines show which big3d probes each instance.", "Open the monitor instances tab: app1 members have two instances each, and both must be up.", "In the Health monitors card, create your own monitor, then tick it on another wide IP's pool."],
+    sel: "vs_app1_nyc",
+    setup() { addApp1Monitor(); },
+  },
+  app: {
+    title: "Application failure the bigip monitor misses",
+    text: "pool_app1 uses bigip and the custom HTTP monitor. pool_app2 (Round Robin here) uses only bigip. At 14:02:30 the application behind both Seattle virtual servers starts returning 503 Service Unavailable. The LTM still sees its pool members up, so both virtual servers stay green on the LTM.",
+    watch: ["ltm-sea's big3d keeps reporting vs_app2_sea green, so gtmd keeps handing it out for app2.chala.info (10.2.20.20 inside, 203.0.113.120 outside) even though users get errors.", "The GET /health probe to vs_app1_sea gets 503 back. The receive string 200 OK is not found.", "After the 120 s timeout both gtmds mark vs_app1_sea red, and app1.chala.info resolves only to vs_app1_nyc (10.1.20.10 inside, 203.0.113.10 outside)."],
+    fix: "Tick http_app1_health on app2 and watch vs_app2_sea go red too. Or click a Seattle virtual server and restore the application.",
+    sel: "vs_app1_sea",
+    setup() { addApp1Monitor(); WIPS.app2.method = "rr"; addTimer(30, () => { for (const v of ["vs_app1_sea", "vs_app2_sea"]) N[v].appOk = false; log("ltm-sea", "notice", "shell", "(lab) application servers behind vs_app1_sea and vs_app2_sea now return HTTP 503"); render(); }); },
+  },
+  dcfail: {
+    title: "Data center failover with Global Availability",
+    text: "app2 uses Global Availability with vs_app2_nyc first. At 14:02:30 every pool member behind vs_app2_nyc goes down on ltm-nyc, so the virtual server turns red.",
+    watch: ["ltm-nyc's big3d reports vs_app2_nyc red in its next status list. The bigip monitor doesn't wait for a timeout.", "app2.chala.info answers switch from vs_app2_nyc to vs_app2_sea, for both the internal and the external pool, once each LDNS's cached A record (30 s) expires.", "app1 and app3 keep answering from both data centers."],
+    fix: "Click vs_app2_nyc and restore its pool members. Global Availability moves answers back to New York.",
+    sel: "vs_app2_nyc",
+    setup() { addTimer(30, () => { N.vs_app2_nyc.vsUp = false; log("ltm-nyc", "err", "tmm", "No members available for pool /Common/app2_pool", "01010028:3"); render(); }); },
+  },
+  generic: {
+    title: "Generic hosts monitored through prober pools",
+    text: "app4.chala.info points to pool_app4 (Global Availability), whose members are two plain web servers of server type Generic Host: gen-nyc-01 first, then gen-sea-01. They run no big3d, so they have no iQuery connection and the bigip monitor can't be used. Their custom monitor http_app4 is run by a big3d from each data center's prober pool: pp_east (set here to Global Availability: gtm-nyc, then ltm-nyc) for gen-nyc-01, and pp_west (ltm-sea, then gtm-sea) for gen-sea-01. At 14:02:40 big3d stops on gtm-nyc.",
+    watch: ["No iQuery line goes to either generic host. gtmd never talks to them directly.", "Orange GET / probes go from gtm-nyc to gen-nyc-01 and from ltm-sea to gen-sea-01. Each result travels to both gtmds over that BIG-IP's iQuery connections.", "When gtm-nyc's big3d stops, both gtmds lose iQuery to it, so the next probe of gen-nyc-01 moves to ltm-nyc, pp_east member #2. The member stays green.", "Click gen-nyc-01 and stop the web service: probes get RST, and after 120 s gtmd marks it red and app4.chala.info fails over to gen-sea-01 (10.2.30.11 inside, 203.0.113.140 outside)."],
+    fix: "Change a generic host's prober preference to Inside Data Center or the other pool and watch the prober move.",
+    sel: "gen-nyc-01",
+    setup() { POOLS.pp_east.method = "ga"; addTimer(40, () => { N["gtm-nyc"].big3d = false; log("gtm-nyc", "notice", "bigstart", "big3d stopped (bigstart stop big3d)"); render(); }); },
   },
   wan: {
     title: "WAN link cut between data centers",
     text: "At 14:02:30 the private WAN between New York and Seattle drops. Each DNS device can still answer queries from the internet.",
-    watch: ["All cross-DC iQuery connections drop. Each gtmd hears only the big3d agents in its own data center.", "After the bigip monitor timeout (90 s), gtm-nyc marks vs_web_sea red and gtm-sea marks vs_web_nyc red.", "Switch “Status as seen by” between the two gtmds: each now hands out only its local data center."],
+    watch: ["All cross-DC iQuery connections drop. Each gtmd hears only the big3d agents in its own data center.", "After the bigip timeout (90 s), gtm-nyc marks the Seattle virtual servers red, and gtm-sea marks the New York ones red.", "Switch “Status as seen by” between the two gtmds: each now hands out only its local data center."],
     fix: "Click the WAN link and restore it. Connections come back and the Reconnects counter in the iQuery tab goes up.",
+    sel: "gtm-nyc",
     setup() { addTimer(30, () => { S.wan = false; log("gtm-nyc", "notice", "gtmd", "(lab) WAN link dc_nyc ↔ dc_sea down"); render(); }); },
   },
   cert: {
     title: "iQuery certificate mismatch",
     text: "At 14:02:25 ltm-nyc gets a new device certificate, but nobody re-runs bigip_add on gtm-sea. gtm-sea's iQuery to ltm-nyc now fails the TLS handshake. gtm-nyc is unaffected.",
-    watch: ["The gtm-sea → ltm-nyc line turns red and dashed, and the log shows certificate verify failed.", "After 90 s gtm-sea marks vs_web_nyc red. gtm-nyc still sees it green.", "app-nyc-02 is probed by ltm-nyc (pp_east, Round Robin), so gtm-sea also stops hearing that host's results and marks it red after 120 s.", "The DNS answers tab shows that gtm-sea never answers 10.1.20.100. The two DNS devices now give different answers."],
+    watch: ["The gtm-sea → ltm-nyc line turns red and dashed, and the log shows certificate verify failed.", "After 90 s gtm-sea marks all three New York virtual servers red. gtm-nyc still sees them green.", "The DNS answers tab shows the two DNS devices now give different answers."],
     fix: "Click the red line and run bigip_add to exchange certificates again.",
+    sel: "gtm-sea",
     setup() { addTimer(25, () => { conn("gtm-sea", "ltm-nyc").cert = true; log("ltm-nyc", "notice", "shell", "(lab) device certificate /config/httpd/conf/ssl.crt/server.crt replaced"); render(); }); },
   },
-  noprober: {
-    title: "No prober available",
-    text: "dc_sea is set to prefer prober pool pp_west with fallback None. At 14:02:35 big3d stops on both Seattle BIG-IPs.",
-    watch: ["app-sea-01 has nobody left to probe it, so its monitor instance goes blue (unknown) and the log warns that no prober is available.", "vs_web_sea goes red after 90 s because ltm-sea's big3d no longer reports.", "Try changing dc_sea's fallback to Any Available. A New York big3d picks up the probe across the WAN."],
-    fix: "Change the fallback, or start big3d again on ltm-sea or gtm-sea.",
-    setup() { DC.sea.pref = "pool:pp_west"; DC.sea.fb = "none"; addTimer(35, () => { N["ltm-sea"].big3d = false; N["gtm-sea"].big3d = false; log("ltm-sea", "notice", "bigstart", "big3d stopped (bigstart stop big3d)"); log("gtm-sea", "notice", "bigstart", "big3d stopped (bigstart stop big3d)"); render(); }); },
-  },
   rtt: {
-    title: "Round Trip Times load balancing",
-    text: "The wide IP uses Round Trip Times. That method needs path metrics: big3d in each data center probes the LDNS and reports the RTT back over iQuery.",
-    watch: ["The first query from each LDNS has no metrics, so gtmd answers with the alternate method (Round Robin) and asks for a path probe.", "Purple DNS_DOT probes go from one BIG-IP in each data center to the LDNS.", "After that, LDNS 198.51.100.53 gets New York answers (21 ms vs 74 ms) and 203.0.113.53 gets Seattle answers.", "Open the Paths tab to see the metrics each gtmd holds."],
-    setup() { WIP.method = "rtt"; },
+    title: "Round Trip Times for app3.chala.info",
+    text: "pool_app3 uses Round Trip Times. That method needs path metrics: big3d in each data center probes the LDNS and reports the RTT back over iQuery.",
+    watch: ["The first app3 query from each LDNS has no metrics, so gtmd answers with the alternate method (Round Robin) and asks for a path probe.", "Purple DNS_DOT probes go from one BIG-IP in each data center to the LDNS.", "After that, the office resolver 10.0.0.53 gets New York answers (4 ms vs 66 ms) and the ISP resolver 198.51.100.53 gets Seattle answers (17 ms vs 69 ms).", "Open the Paths tab to see the metrics each gtmd holds."],
+    sel: "ldns-a",
+    setup() { addTimer(6, () => { dnsQuery("ldns-a", "app3"); dnsQuery("ldns-b", "app3"); }); },
   },
 };
+/* scenarios load paused; Start begins traffic */
 function runScenario(k) {
-  S.scen = k; fresh(); SCEN[k].setup();
-  if (k !== "baseline") S.sel = { k: "node", id: k === "cert" ? "gtm-sea" : k === "noprober" ? "app-sea-01" : k === "wan" ? "gtm-nyc" : k === "rtt" ? "ldns-a" : "gtm-nyc" };
-  log("gtm-nyc", "notice", "gtmd", `(lab) scenario started: ${SCEN[k].title}`);
-  S.playing = true;
+  S.scen = k; fresh(); SCEN[k].setup(); syncInst();
+  S.sel = { k: "node", id: SCEN[k].sel || "gtm-nyc" };
+  log("gtm-nyc", "notice", "gtmd", `(lab) scenario loaded: ${SCEN[k].title}`);
+  S.playing = S.started = false;
   renderScen(); renderAll();
 }
 
 /* ---------- main loop ---------- */
 function secondTick() {
   updateConns(); heartbeats();
-  for (const m of MEM) if (S.now >= m.next) { m.next += m.interval; m.mon === "bigip" ? runBigip(m) : runHttp(m); }
+  for (const l of LTMS) if (S.now >= N[l].nextBig) { N[l].nextBig += MONS.bigip.interval; runBigip(l); }
+  for (const i of INST) if (i.mon !== "bigip" && S.now >= i.next) { i.next = S.now + MONS[i.mon].interval; runCustom(i); }
   checkTimeouts();
   if (S.dnsOn && S.now >= S.nextDns) { S.nextDns = S.now + 5 + Math.random() * 4; dnsQuery(); }
 }
@@ -650,8 +919,9 @@ function step() {
     const due = TIMERS.filter(t => t.t <= S.now);
     if (due.length) { TIMERS = TIMERS.filter(t => t.t > S.now); due.sort((a, b) => a.t - b.t).forEach(t => t.fn()); }
   }
-  while (S.now >= S.nextSec) { S.nextSec += 1; secondTick(); }
+  while (S.playing && S.now >= S.nextSec) { S.nextSec += 1; secondTick(); }
   for (let i = PK.length - 1; i >= 0; i--) {
+    if (!S.playing) break;
     const p = PK[i], prog = (S.now - p.t0) / p.dur;
     if (p.drop && prog >= 0.5) { const [x, y] = bez(p.geom, 0.5); flash(x, y, "r"); kill(i); continue; }
     if (prog >= 1) { kill(i); p.onArrive && p.onArrive(); }
@@ -664,15 +934,21 @@ function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); f
 function txt(attrs, s, parent) { const e = el("text", attrs, parent); e.textContent = s; return e; }
 function buildSvg() {
   const svg = $("#topo"); svg.innerHTML = "";
-  el("rect", { x: 10, y: 20, width: 980, height: 120, rx: 10, class: "zone-inet" }, svg);
-  txt({ x: 26, y: 42, class: "zlabel" }, "Internet", svg);
-  txt({ x: 26, y: 57, class: "zsub" }, "clients · local DNS resolvers", svg);
+  el("rect", { x: 10, y: 20, width: 405, height: 120, rx: 10, class: "zone-corp" }, svg);
+  txt({ x: 26, y: 42, class: "zlabel" }, "Corporate network · internal", svg);
+  txt({ x: 26, y: 57, class: "zsub" }, "office clients · internal resolver (10.0.0.0/8)", svg);
+  el("rect", { x: 425, y: 20, width: 150, height: 120, rx: 10, class: "zone-dmz" }, svg);
+  txt({ x: 441, y: 42, class: "zlabel" }, "DMZ", svg);
+  el("rect", { x: 585, y: 20, width: 405, height: 120, rx: 10, class: "zone-inet" }, svg);
+  txt({ x: 601, y: 42, class: "zlabel" }, "Internet · external", svg);
+  txt({ x: 601, y: 57, class: "zsub" }, "internet clients · ISP resolver", svg);
   for (const dc of ["nyc", "sea"]) {
     const x = dc === "nyc" ? 10 : 520;
     const g = el("g", { class: "dczone", "data-sel": "dc:" + dc, tabindex: 0 }, svg);
     el("rect", { x, y: 160, width: 470, height: 385, rx: 10, class: "zone" }, g);
     txt({ x: x + 16, y: 184, class: "zlabel" }, `${DC[dc].name} · ${DC[dc].city}`, g);
     txt({ x: x + 16, y: 200, class: "zsub", id: "dcsub-" + dc }, "", g);
+    txt({ x: x + 16, y: 534, class: "zsub" }, `edge NAT: 203.0.113.${dc === "nyc" ? "0/25" : "128/25"} ↔ 10.${dc === "nyc" ? 1 : 2}.0.0/16`, g);
   }
   el("line", { x1: 500, y1: 175, x2: 500, y2: 535, class: "wanline", id: "wanline" }, svg);
   const lines = el("g", { id: "lines" }, svg);
@@ -682,20 +958,11 @@ function buildSvg() {
     el("path", { d, class: "iql", id: "L-" + c.key }, lines);
     el("path", { d, class: "hit", "data-sel": "conn:" + c.key }, lines).appendChild(el("title", {})).textContent = `iQuery: gtmd on ${c.g} → big3d on ${c.b}`;
   }
-  const asg = el("g", { id: "assign" }, svg);
-  for (const m of MEM) if (m.mon === "http") el("line", { class: "assign", id: "A-" + m.id }, asg);
+  el("g", { id: "assign" }, svg);
   const w = el("g", { class: "wan", id: "wan", "data-sel": "wan:x", tabindex: 0 }, svg);
   el("rect", { x: 462, y: 392, width: 76, height: 24, rx: 12 }, w);
   txt({ x: 500, y: 408, "text-anchor": "middle", id: "wantxt" }, "WAN up", w);
-  // LTM VS tags
-  for (const m of MEM) if (m.mon === "bigip") {
-    const s = N[m.server];
-    el("line", { x1: s.x, y1: s.y + 30, x2: s.x, y2: s.y + 52, class: "stem" }, svg);
-    const g = el("g", { class: "vs", "data-sel": "node:" + m.server, transform: `translate(${s.x},${s.y + 64})` }, svg);
-    el("rect", { x: -64, y: -12, width: 128, height: 24, rx: 12 }, g);
-    el("circle", { cx: -50, cy: 0, r: 5, id: "D-" + m.id }, g);
-    txt({ x: -40, y: 4 }, `${m.id} :${m.port}`, g);
-  }
+  for (const l of LTMS) { const s = N[l]; el("line", { x1: s.x, y1: s.y + 31, x2: s.x, y2: 345 + 2 * 55, class: "stem" }, svg); }
   for (const n of Object.values(N)) {
     const g = el("g", { class: "node " + n.kind, id: "N-" + n.id, "data-sel": "node:" + n.id, transform: `translate(${n.x},${n.y})`, tabindex: 0 }, svg);
     if (n.kind === "bigip") {
@@ -706,19 +973,33 @@ function buildSvg() {
       if (n.dns) { el("circle", { cx: -50, cy: 17, r: 4, class: "light", id: "Lg-" + n.id }, g); txt({ x: -43, y: 20, class: "lt" }, "gtmd", g); }
       el("circle", { cx: n.dns ? 0 : -50, cy: 17, r: 4, class: "light", id: "Lb-" + n.id }, g);
       txt({ x: n.dns ? 7 : -43, y: 20, class: "lt" }, "big3d", g);
+    } else if (n.kind === "vs") {
+      el("rect", { x: -84, y: -19, width: 168, height: 38, rx: 8, class: "nb" }, g);
+      el("circle", { cx: -70, cy: 0, r: 5.5, id: "D-" + n.id }, g);
+      txt({ x: -58, y: -3, class: "nname", style: "font-size:12.5px" }, n.id, g);
+      txt({ x: -58, y: 11, class: "nip" }, `${n.ip}:${n.port}`, g);
+      txt({ x: 76, y: -3, class: "ntag", "text-anchor": "end" }, n.wip.toUpperCase(), g);
+      txt({ x: 76, y: 11, class: "apperr", "text-anchor": "end", id: "AE-" + n.id }, "", g);
     } else if (n.kind === "generic") {
-      el("rect", { x: -64, y: -28, width: 128, height: 56, rx: 6, class: "nb" }, g);
-      txt({ x: -54, y: -9, class: "nname" }, n.id, g);
-      txt({ x: -54, y: 6, class: "nip" }, n.ip + ":80", g);
-      txt({ x: -54, y: 20, class: "ntag" }, "GENERIC HOST", g);
-      el("circle", { cx: 50, cy: -13, r: 5.5, id: "D-" + MEM.find(m => m.server === n.id).id }, g);
+      el("rect", { x: -70, y: -30, width: 140, height: 60, rx: 6, class: "nb" }, g);
+      el("circle", { cx: -56, cy: -12, r: 5.5, id: "D-" + n.id }, g);
+      txt({ x: -45, y: -8, class: "nname", style: "font-size:13px" }, n.id, g);
+      txt({ x: 62, y: -8, class: "ntag", "text-anchor": "end" }, "APP4", g);
+      txt({ x: -60, y: 8, class: "nip" }, `${n.ip}:${n.port}`, g);
+      txt({ x: -60, y: 22, class: "ntag" }, "GENERIC HOST", g);
+      txt({ x: 62, y: 22, class: "apperr", "text-anchor": "end", id: "AE-" + n.id }, "", g);
+    } else if (n.kind === "bind") {
+      el("rect", { x: -66, y: -26, width: 132, height: 52, rx: 6, class: "nb" }, g);
+      txt({ x: 0, y: -8, class: "nname", "text-anchor": "middle" }, "BIND", g);
+      txt({ x: 0, y: 6, class: "nip", "text-anchor": "middle" }, `ns1 · ${n.ip}`, g);
+      txt({ x: 0, y: 19, class: "ntag", "text-anchor": "middle" }, "2 VIEWS · chala.info", g);
     } else if (n.kind === "ldns") {
       el("rect", { x: -70, y: -24, width: 140, height: 48, rx: 24, class: "nb" }, g);
-      txt({ x: 0, y: -4, class: "nname", "text-anchor": "middle" }, "LDNS " + n.id.slice(-1).toUpperCase(), g);
+      txt({ x: 0, y: -4, class: "nname", "text-anchor": "middle" }, `LDNS ${n.id.slice(-1).toUpperCase()} · ${n.internal ? "internal" : "ISP"}`, g);
       txt({ x: 0, y: 11, class: "nip", "text-anchor": "middle" }, n.ip, g);
     } else {
       el("rect", { x: -48, y: -20, width: 96, height: 40, rx: 6, class: "nb" }, g);
-      txt({ x: 0, y: -3, class: "nname", "text-anchor": "middle", style: "font-size:12.5px" }, "client", g);
+      txt({ x: 0, y: -3, class: "nname", "text-anchor": "middle", style: "font-size:12.5px" }, "client " + n.id.slice(-1).toUpperCase(), g);
       txt({ x: 0, y: 11, class: "nip", "text-anchor": "middle" }, n.ip, g);
     }
   }
@@ -731,23 +1012,25 @@ function lightCls(on, warn) { return "light " + (on ? "c-g" : warn ? "c-r" : "c-
 function renderSvg() {
   for (const n of Object.values(N)) {
     const g = $("#N-" + CSS.escape(n.id));
-    const sel = S.sel.k === "node" && S.sel.id === n.id;
-    g.classList.toggle("sel", sel);
-    g.classList.toggle("off", (n.kind === "bigip" || n.kind === "generic") && !n.up);
+    g.classList.toggle("sel", S.sel.k === "node" && S.sel.id === n.id);
+    g.classList.toggle("hl", !!HINT && HINT.node === n.id);
+    g.classList.toggle("off", ((n.kind === "bigip" || n.kind === "bind") && !n.up) || (n.kind === "vs" && !N[n.server].up));
     if (n.kind === "bigip") {
       if (n.dns) $("#Lg-" + n.id).setAttribute("class", lightCls(n.up, false));
       $("#Lb-" + n.id).setAttribute("class", lightCls(n.up && n.big3d, n.up));
     }
   }
   const vg = S.viewGtm, vUp = N[vg].up;
-  for (const m of MEM) {
-    const d = $("#D-" + m.id), v = VIEW[vg][m.id];
-    d.setAttribute("class", vUp ? "c-" + DOTC[v.st] : "c-k");
-    const a = $("#A-" + m.id);
-    if (a) {
-      if (m.prober && S.show.probe) { const p = N[m.prober], h = N[m.server]; a.setAttribute("x1", p.x); a.setAttribute("y1", p.y); a.setAttribute("x2", h.x); a.setAttribute("y2", h.y); a.style.display = ""; }
-      else a.style.display = "none";
-    }
+  for (const v of MEMBERS) {
+    const n = N[v];
+    $("#D-" + v).setAttribute("class", vUp ? "c-" + DOTC[memberSt(vg, v).st] : "c-k");
+    $("#AE-" + v).textContent = !n.vsUp ? (n.kind === "generic" ? "stopped" : "VS down") : !n.appOk ? "app 503" : "";
+  }
+  const asg = $("#assign"); asg.innerHTML = "";
+  if (S.show.probe) for (const i of INST) {
+    if (i.mon === "bigip" || !i.prober) continue;
+    const p = N[i.prober], h = N[i.vs];
+    el("line", { x1: p.x, y1: p.y, x2: h.x, y2: h.y, class: "assign" }, asg);
   }
   for (const c of Object.values(CONN)) {
     if (c.g === c.b) continue;
@@ -786,36 +1069,55 @@ function drawPackets() {
 /* ---------- side rail ---------- */
 function statusPill(st) { return `<span class="pill"><span class="dot ${DOTC[st]}"></span>${COLOR[st]}</span>`; }
 function opt(v, cur, label) { return `<option value="${v}"${v === cur ? " selected" : ""}>${esc(label || RULES[v])}</option>`; }
+function lookupButtons(ldns) { return WKEYS.map(w => `<button data-act="dnsq:${ldns}:${w}">Look up ${w}</button>`).join(""); }
+function proberFields(n, note) {
+  return `<div class="field"><label for="f-pref">Prober preference${note}</label><select id="f-pref" data-set="pref:${n.id}">${opt("inherit", n.pref, `Inherit from data center (${RULES[DC[n.dc].pref]})`)}${PREF_OPTS.map(o => opt(o, n.pref)).join("")}</select></div>
+  <div class="field"><label for="f-fb">Prober fallback</label><select id="f-fb" data-set="fb:${n.id}">${opt("inherit", n.fb, `Inherit from data center (${RULES[DC[n.dc].fb]})`)}${FB_OPTS.map(o => opt(o, n.fb)).join("")}</select></div>`;
+}
 function renderInspector() {
   const box = $("#inspector"), s = S.sel;
   let h = "";
   if (s.k === "node") {
     const n = N[s.id];
     if (n.kind === "bigip") {
+      const vss = VSS.filter(v => N[v].server === n.id);
       h += `<h3>${n.id}<span class="badge">${n.model}</span></h3>
-      <dl class="kv"><dt>Data center</dt><dd>${DC[n.dc].name}</dd><dt>Self IP</dt><dd>${n.ip}</dd>${n.dns ? `<dt>DNS listener</dt><dd>${n.listener}:53</dd>` : ""}<dt>Processes</dt><dd>${n.dns ? "gtmd, " : ""}big3d${n.dns ? "" : ", tmm"}</dd></dl>
-      <div class="live" id="live"></div>
+      <dl class="kv"><dt>Data center</dt><dd>${DC[n.dc].name}</dd><dt>Self IP</dt><dd>${n.ip}</dd>${n.dns ? `<dt>DNS listener</dt><dd>${n.listener}:53 (public ${n.pub}, NAT)</dd><dt>Authoritative for</dt><dd>gtm.chala.info</dd>` : ""}<dt>Processes</dt><dd>${n.dns ? "gtmd, " : ""}big3d${n.dns ? "" : ", tmm"}</dd><dt>Server monitor</dt><dd>/Common/bigip</dd></dl>`;
+      if (!n.dns) h += proberFields(n, " (for custom monitors on this server's virtual servers)");
+      h += `<div class="live" id="live"></div>
       <div class="acts">
         <button data-act="power:${n.id}" class="${n.up ? "warn" : ""}">${n.up ? "Power off" : "Power on"}</button>
         <button data-act="big3d:${n.id}" ${n.up ? "" : "disabled"}>${n.big3d ? "bigstart stop big3d" : "bigstart start big3d"}</button>
-        ${MEM.filter(m => m.server === n.id).map(m => `<button data-act="vs:${m.id}">${m.vsUp ? `Fail ${m.id}` : `Restore ${m.id}`}</button>`).join("")}
         ${n.dns ? `<button data-act="viewas:${n.id}">Show status as ${n.id}</button>` : ""}
       </div>`;
-    } else if (n.kind === "generic") {
-      h += `<h3>${n.id}<span class="badge">Generic host</span></h3>
-      <dl class="kv"><dt>Data center</dt><dd>${DC[n.dc].name}</dd><dt>Virtual server</dt><dd>${n.ip}:80</dd><dt>Monitor</dt><dd>/Common/http · 30 s / 120 s</dd></dl>
-      <div class="field"><label for="f-pref">Prober preference</label><select id="f-pref" data-set="pref:${n.id}">${opt("inherit", n.pref, `Inherit from data center (${RULES[DC[n.dc].pref]})`)}${PREF_OPTS.map(o => opt(o, n.pref)).join("")}</select></div>
-      <div class="field"><label for="f-fb">Prober fallback</label><select id="f-fb" data-set="fb:${n.id}">${opt("inherit", n.fb, `Inherit from data center (${RULES[DC[n.dc].fb]})`)}${FB_OPTS.map(o => opt(o, n.fb)).join("")}</select></div>
-      <div class="live" id="live"></div>
-      <div class="acts"><button data-act="host:${n.id}" class="${n.up ? "warn" : ""}">${n.up ? "Stop web service" : "Start web service"}</button></div>`;
+      if (vss.length) h += `<span class="lbl">Virtual servers</span><div class="acts">${vss.map(v => `<button data-act="pick:${v}">${v}</button>`).join("")}</div>`;
+    } else if (n.kind === "vs" || n.kind === "generic") {
+      const W = WIPS[n.wip], gen = n.kind === "generic";
+      h += `<h3>${n.id}<span class="badge">${gen ? "Generic host" : "Virtual server"}</span></h3>
+      <dl class="kv"><dt>Server</dt><dd>/Common/${n.server} (${gen ? "Generic Host" : "BIG-IP LTM"})</dd><dt>Internal address</dt><dd>${n.ip}:${n.port}</dd><dt>Public address</dt><dd>${n.pub}:${n.port} (edge NAT → ${n.ip})</dd><dt>Data center</dt><dd>${DC[n.dc].name}</dd><dt>Name</dt><dd>${fqdn(n.wip)} → ${W.name}</dd><dt>GTM pools</dt><dd>/Common/${W.pool}_int, /Common/${W.pool}_ext · ${METHODS[W.method]}</dd><dt>Monitor</dt><dd>${esc(monRule(W))}</dd>${gen ? `<dt>big3d / iQuery</dt><dd>none</dd>` : ""}</dl>`;
+      if (gen) h += proberFields(n, "");
+      h += `<div class="live" id="live"></div>
+      <div class="acts">
+        <button data-act="vsfail:${n.id}" class="${n.vsUp ? "warn" : "primary"}">${gen ? (n.vsUp ? "Stop web service" : "Start web service") : (n.vsUp ? "Fail LTM pool members" : "Restore LTM pool members")}</button>
+        <button data-act="app:${n.id}" class="${n.appOk ? "warn" : "primary"}">${n.appOk ? "App returns HTTP 503" : "Restore application"}</button>
+      </div>
+      <p class="small" style="margin:0">${gen ? "A generic host runs no big3d, so it has no iQuery connection and can't use the bigip monitor. gtmd learns its status only from custom monitor probes sent by a BIG-IP big3d, picked by the prober preference above." : "Failing the LTM pool members turns the virtual server red on the LTM, and the bigip monitor reports that. An HTTP 503 from the application leaves the LTM virtual server green. Only a custom HTTP or HTTPS monitor with a receive string notices it."}</p>`;
+    } else if (n.kind === "bind") {
+      h += `<h3>ns1.chala.info<span class="badge">BIND</span></h3>
+      <dl class="kv"><dt>Address</dt><dd>${n.ip}:53</dd><dt>Authoritative for</dt><dd>chala.info</dd><dt>View internal</dt><dd>match-clients ${INTERNAL_NET} · gtm NS ${N["gtm-nyc"].listener}, ${N["gtm-sea"].listener}</dd><dt>View external</dt><dd>match-clients any · gtm NS ${N["gtm-nyc"].pub}, ${N["gtm-sea"].pub}</dd><dt>named</dt><dd>${n.up ? "running" : "stopped"}</dd></dl>
+      <p class="small" style="margin:0">BIND never sees the wide IPs. In both views it answers each appN.chala.info with a CNAME to appN.gtm.chala.info and refers resolvers to BIG-IP DNS, at the listener addresses that side can reach.</p>
+      <div class="acts"><button data-act="bind:x" class="${n.up ? "warn" : "primary"}">${n.up ? "Stop named" : "Start named"}</button><button data-act="tab:zone">Show named.conf and zones</button></div>`;
     } else if (n.kind === "ldns") {
-      h += `<h3>LDNS ${n.id.slice(-1).toUpperCase()}<span class="badge">Resolver</span></h3>
-      <dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>Real RTT</dt><dd>dc_nyc ${n.rtt.nyc} ms · dc_sea ${n.rtt.sea} ms</dd></dl>
+      h += `<h3>LDNS ${n.id.slice(-1).toUpperCase()}<span class="badge">${n.internal ? "Internal resolver" : "ISP resolver"}</span></h3>
+      <dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>BIND view</dt><dd>${viewOf(n.id)}</dd><dt>GTM topology</dt><dd>${n.internal ? "in" : "not in"} internal_nets → _${n.internal ? "int" : "ext"} pools</dd><dt>Real RTT</dt><dd>dc_nyc ${n.rtt.nyc} ms · dc_sea ${n.rtt.sea} ms</dd></dl>
       <div class="live" id="live"></div>
-      <div class="acts"><button data-act="dnsq:${n.id}">Send query for www.example.com</button><button data-act="flush:${n.id}">Delete path metrics</button></div>`;
+      <div class="acts">${lookupButtons(n.id)}</div>
+      <div class="acts"><button data-act="flushc:${n.id}">rndc flush (clear cache)</button><button data-act="flush:${n.id}">Delete path metrics</button></div>`;
     } else {
       const L = LDNS.find(l => N[l].client === n.id);
-      h += `<h3>Client<span class="badge">Stub resolver</span></h3><dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>Uses LDNS</dt><dd>${N[L].ip}</dd></dl><div class="acts"><button data-act="dnsq:${L}">Resolve www.example.com</button></div>`;
+      h += `<h3>Client ${n.id.slice(-1).toUpperCase()}<span class="badge">${N[L].internal ? "Office" : "Internet"}</span></h3><dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>Uses LDNS</dt><dd>${ldnsName(L)} · ${N[L].ip}</dd><dt>Gets</dt><dd>${N[L].internal ? "internal (10.x) answers" : "public (203.0.113.x) answers"}</dd></dl>
+      <span class="lbl">Walk through a lookup, with hints</span><div class="acts">${WKEYS.map(w => `<button class="primary" data-act="guide:${L}:${w}">${fqdn(w)}</button>`).join("")}</div>
+      <span class="lbl">Quick lookup</span><div class="acts">${lookupButtons(L)}</div>`;
     }
   } else if (s.k === "conn") {
     const c = CONN[s.id];
@@ -829,7 +1131,7 @@ function renderInspector() {
   } else if (s.k === "dc") {
     const d = DC[s.id];
     h += `<h3>${d.name}<span class="badge">Data center</span></h3>
-    <p class="small" style="margin:0">Servers set to Inherit use these rules. They apply only to monitors that need a prober, not to the bigip monitor.</p>
+    <p class="small" style="margin:0">Servers set to Inherit use these rules. They apply only to custom monitors, which need a prober. The bigip monitor needs none.</p>
     <div class="field"><label for="f-dpref">Prober preference</label><select id="f-dpref" data-set="dcpref:${s.id}">${PREF_OPTS.map(o => opt(o, d.pref)).join("")}</select></div>
     <div class="field"><label for="f-dfb">Prober fallback</label><select id="f-dfb" data-set="dcfb:${s.id}">${FB_OPTS.map(o => opt(o, d.fb)).join("")}</select></div>
     <div class="live" id="live"></div>`;
@@ -850,14 +1152,25 @@ function renderLive() {
       h += `<span class="lbl">Connections into this big3d</span>`;
       h += GTMS.map(g => { const c = conn(g, n.id); return `<span class="pill"><span class="dot ${c.st === "connected" ? "g" : c.st === "ssl" ? "r" : c.st === "connecting" ? "y" : "k"}"></span>gtmd@${g} ${c.g === c.b ? "(self) " : ""}${c.st}</span>`; }).join("");
       if (n.dns) { const up = BIGIPS.filter(b => conn(n.id, b).st === "connected").length; h += `<span class="lbl">This gtmd</span><span class="pill">connected to ${up}/4 big3d agents</span>`; }
-      const probing = MEM.filter(m => m.prober === n.id);
+      const probing = INST.filter(i => i.prober === n.id && i.mon !== "bigip");
       const pools = Object.values(POOLS).filter(p => p.members.some(x => x.id === n.id)).map(p => `${p.name} #${p.members.findIndex(x => x.id === n.id) + 1}`);
-      h += `<span class="lbl">Prober role</span><span class="small">${pools.length ? "Member of " + pools.join(", ") + ". " : ""}${probing.length ? "Probing " + probing.map(m => m.server).join(", ") + "." : "Not probing any monitor instance right now."}</span>`;
-    } else if (n.kind === "generic") {
-      const m = MEM.find(x => x.server === n.id);
-      h += `<span class="lbl">Current prober</span><span class="small">${m.prober ? `<b class="mono">${m.prober}</b> (${N[m.prober].ip}) · ${esc(m.selWhy)}` : esc(m.selWhy || "Not assigned yet")}</span>`;
-      h += `<span class="lbl">Monitor status</span>` + GTMS.map(g => `<span class="pill">gtmd@${g}: ${N[g].up ? statusPill(VIEW[g][m.id].st) : "device off"}</span>`).join("");
+      h += `<span class="lbl">Prober role</span><span class="small">${!n.dns ? "Reports its own virtual servers for the bigip monitor. " : ""}${pools.length ? "Member of " + pools.join(", ") + ". " : ""}${probing.length ? "Probing " + probing.map(i => `${i.vs} (${i.mon})`).join(", ") + "." : "Not running any custom monitor probes right now."}</span>`;
+    } else if (n.kind === "vs" || n.kind === "generic") {
+      h += `<span class="lbl">Pool member status</span>` + GTMS.map(g => `<span class="pill">gtmd@${g}: ${N[g].up ? statusPill(memberSt(g, n.id).st) : "device off"}</span>`).join("");
+      if (!instOf(n.id).length) h += `<span class="small">No monitor on ${WIPS[n.wip].pool}: the member stays blue (unknown) and gtmd still hands it out.</span>`;
+      for (const i of instOf(n.id)) {
+        const m = MONS[i.mon];
+        h += `<span class="lbl">/Common/${m.name}</span><span class="small">${m.type === "bigip" ? `Reported by big3d on ${n.server}. No probe is sent.` : i.prober ? `Probed by <b class="mono">${i.prober}</b> (${N[i.prober].ip}) · ${esc(i.selWhy)}` : esc(i.selWhy || "Not run yet")}${i.last ? `<br>Last probe: ${esc(i.last)}` : ""}</span>`;
+        h += GTMS.map(g => `<span class="pill">gtmd@${g}: ${N[g].up ? statusPill(VIEW[g][i.key].st) : "device off"}</span>`).join("");
+      }
     } else if (n.kind === "ldns") {
+      const C = CACHE[n.id], left = t => Math.ceil(t - S.now), rows = [];
+      if (C.ns > S.now) rows.push(`gtm.chala.info NS gtm-nyc, gtm-sea · ${left(C.ns)} s`);
+      for (const w of WKEYS) {
+        if (C.cname[w] > S.now) rows.push(`${fqdn(w)} CNAME ${WIPS[w].name} · ${left(C.cname[w])} s`);
+        const a = C.a[w]; if (a && a.exp > S.now) rows.push(`${WIPS[w].name} A ${a.ip} · ${left(a.exp)} s`);
+      }
+      h += `<span class="lbl">Cache (record · TTL left)</span>` + (rows.length ? rows.map(r => `<span class="pill">${r}</span>`).join("") : `<span class="small">Empty</span>`);
       h += `<span class="lbl">Path metrics held by each gtmd</span>`;
       for (const g of GTMS) { const pm = PATHS[g][n.id]; h += `<span class="pill">${g}: ${["nyc", "sea"].map(d => pm[d] ? `${DC[d].name} ${pm[d].rtt} ms` : `${DC[d].name} —`).join(" · ")}</span>`; }
     }
@@ -865,14 +1178,59 @@ function renderLive() {
     const c = CONN[s.id];
     h += `<dl class="kv"><dt>State</dt><dd>${c.st}${c.st !== "connected" && c.lostReason ? ` (${esc(c.lostReason === "ssl" ? "certificate verify failed" : c.lostReason)})` : ""}</dd><dt>Reconnects</dt><dd>${c.rec}</dd><dt>Bits in / out</dt><dd>${fmtBits(c.bin)} / ${fmtBits(c.bout)}</dd></dl>`;
   } else if (s.k === "dc") {
-    const hosts = GENERIC.filter(id => N[id].dc === s.id);
-    h += `<span class="lbl">Generic hosts here</span>` + hosts.map(id => { const m = MEM.find(x => x.server === id); return `<span class="small"><b class="mono">${id}</b> → ${m.prober ? m.prober : "no prober"}${N[id].pref === "inherit" ? "" : " (own preference)"}</span>`; }).join("");
+    const list = INST.filter(i => i.mon !== "bigip" && N[i.vs].dc === s.id);
+    h += `<span class="lbl">Custom monitor instances here</span>` + (list.length ? list.map(i => `<span class="small"><b class="mono">${i.vs}</b> (${i.mon}) → ${i.prober || "no prober"}</span>`).join("") : `<span class="small">None. Tick a custom monitor on a wide IP's pool.</span>`);
   }
   box.innerHTML = h;
 }
+function renderWip() {
+  let h = `<h3>Wide IPs<span class="badge">gtm.chala.info</span></h3><span class="small" id="wipvg"></span>`;
+  for (const k of WKEYS) {
+    const W = WIPS[k];
+    h += `<div class="pool"><div class="pool-head"><b>${W.name}</b><select aria-label="${W.pool} pools load balancing mode" data-set="wmethod:${k}">${Object.entries(METHODS).map(([v, l]) => opt(v, W.method, l)).join("")}</select></div>
+    <span class="small">CNAME from ${fqdn(k)} · Topology picks ${W.pool}_int (internal LDNS) or ${W.pool}_ext. Both pools: ${METHODS[W.method]}${W.method === "rtt" ? ", alternate Round Robin" : ""}, TTL ${POOL_TTL} s, fallback return-to-dns</span>
+    <div class="chk"><span class="small">Monitors</span>${Object.keys(MONS).map(mn => `<label${mn === "bigip" && W.generic ? ' title="The bigip monitor needs a BIG-IP server"' : ""}><input type="checkbox" data-set="wmon:${k}:${mn}" ${W.mons.includes(mn) ? "checked" : ""}${mn === "bigip" && W.generic ? " disabled" : ""}>${mn}</label>`).join("")}</div>
+    <div class="live" id="wl-${k}"></div>
+    <div class="acts"><button data-act="dnsq:ldns-a:${k}">Look up from office</button><button data-act="dnsq:ldns-b:${k}">Look up from internet</button></div></div>`;
+  }
+  h += `<div class="acts"><label class="small" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="dnsOn" data-set="dnson:x" ${S.dnsOn ? "checked" : ""}>Generate random DNS queries</label></div>`;
+  $("#wip").innerHTML = h;
+  renderWipLive();
+}
+function renderWipLive() {
+  const vg = S.viewGtm, top = $("#wipvg"); if (!top) return;
+  top.textContent = `Member dots show status as seen by gtmd@${vg}.`;
+  for (const k of WKEYS) $("#wl-" + k).innerHTML = WIPS[k].members.map(v => `<span class="pill"><span class="dot ${N[vg].up ? DOTC[memberSt(vg, v).st] : "k"}"></span>${v} · ${N[v].ip} / ${N[v].pub}</span>`).join("");
+  document.querySelectorAll("[data-pok]").forEach(d => d.className = "dot " + (proberOk(d.dataset.pok) ? "g" : "r"));
+}
+function renderMons() {
+  const used = mn => Object.values(WIPS).filter(W => W.mons.includes(mn)).map(W => W.pool);
+  let h = `<h3>Health monitors</h3><p class="small" style="margin:0">Tick a monitor on a wide IP above to put it on that pool. With several monitors, all must pass.</p>`;
+  for (const m of Object.values(MONS)) {
+    const u = used(m.name);
+    h += `<div class="pool"><div class="pool-head"><b>/Common/${m.name}</b><span class="badge">${m.builtin ? "built-in" : MTYPES[m.type]}</span></div>
+    <span class="small">${m.type === "bigip" ? "No probe. The LTM's big3d reports the status of its own virtual servers over iQuery. Works only for BIG-IP servers." : m.type === "gateway_icmp" ? "A prober big3d pings the member address." : m.type === "tcp" ? "A prober big3d opens a TCP connection to the member." : `A prober big3d sends the request below to the member${m.type === "https" ? " over TLS" : ""} and looks for the receive string.`} Interval ${m.interval} s, timeout ${m.timeout} s.</span>`;
+    if (isWeb(m)) h += `<div class="field"><label for="ms-${m.name}">Send string</label><textarea id="ms-${m.name}" data-set="msend:${m.name}" rows="2">${esc(m.send)}</textarea></div>
+      <div class="field"><label for="mr-${m.name}">Receive string</label><input type="text" id="mr-${m.name}" data-set="mrecv:${m.name}" value="${esc(m.recv)}"></div>`;
+    h += `<span class="small">Used by: ${u.length ? u.join(", ") : m.builtin ? "every LTM pool with no monitor (inherited from the servers)" : "no pool yet"}</span>`;
+    if (!m.builtin) h += `<div class="acts"><button class="warn" data-act="mondel:${m.name}">Delete monitor</button></div>`;
+    h += `</div>`;
+  }
+  const d = S.draft, web = isWeb(d);
+  h += `<div class="pool"><span class="lbl">New custom monitor</span>
+    <div class="row2"><div class="field"><label for="nm-name">Name</label><input type="text" id="nm-name" value="${esc(d.name)}" placeholder="${d.type}_app2_health" autocomplete="off"></div>
+    <div class="field"><label for="nm-type">Type</label><select id="nm-type" data-set="newtype:x">${Object.entries(MTYPES).map(([v, l]) => opt(v, d.type, l)).join("")}</select></div></div>
+    ${web ? `<div class="field"><label for="nm-send">Send string</label><textarea id="nm-send" rows="2">${esc(d.send)}</textarea></div>
+    <div class="field"><label for="nm-recv">Receive string</label><input type="text" id="nm-recv" value="${esc(d.recv)}"></div>` : ""}
+    <div class="row2"><div class="field"><label for="nm-interval">Interval (s)</label><input type="number" id="nm-interval" min="5" value="${d.interval}"></div>
+    <div class="field"><label for="nm-timeout">Timeout (s)</label><input type="number" id="nm-timeout" min="5" value="${d.timeout}"></div></div>
+    <div class="acts"><button class="primary" data-act="monadd">Create monitor</button></div>
+    ${S.err ? `<span class="small err">${esc(S.err)}</span>` : ""}</div>`;
+  $("#mons").innerHTML = h;
+}
 function renderPools() {
-  const used = k => { const r = []; for (const d of Object.keys(DC)) { if (DC[d].pref === "pool:" + k || DC[d].fb === "pool:" + k) r.push(DC[d].name); } for (const id of GENERIC) { const n = N[id]; if (n.pref === "pool:" + k || n.fb === "pool:" + k) r.push(id); } return r; };
-  let h = `<h3>Prober pools</h3>`;
+  const used = k => { const r = []; for (const d of Object.keys(DC)) { if (DC[d].pref === "pool:" + k || DC[d].fb === "pool:" + k) r.push(DC[d].name); } for (const id of PREF_SERVERS) { const n = N[id]; if (n.pref === "pool:" + k || n.fb === "pool:" + k) r.push(id); } return r; };
+  let h = `<h3>Prober pools</h3><p class="small" style="margin:0">Pick which big3d agents run custom monitors. Select a pool as a data center's or server's prober preference to use it.</p>`;
   for (const [k, p] of Object.entries(POOLS)) {
     const u = used(k);
     h += `<div class="pool"><div class="pool-head"><b>/Common/${p.name}</b>
@@ -889,51 +1247,122 @@ function renderPools() {
   }
   $("#pools").innerHTML = h;
 }
-function renderWip() {
-  const vg = S.viewGtm;
-  let h = `<h3>Wide IP www.example.com<span class="badge">A</span></h3>
-  <div class="field"><label for="w-method">Pool pool_web · preferred method</label><select id="w-method" data-set="wipmethod:x">${opt("rr", WIP.method, "Round Robin")}${opt("ga", WIP.method, "Global Availability")}${opt("rtt", WIP.method, "Round Trip Times")}</select></div>
-  <span class="small">Alternate: Round Robin · Fallback: Return to DNS</span>
-  <div class="live" id="wiplive"></div>
-  <div class="acts"><label class="small" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="dnsOn" data-set="dnson:x" ${S.dnsOn ? "checked" : ""}>Generate DNS queries</label></div>
-  <div class="acts"><button data-act="dnsq:ldns-a">Query from LDNS A</button><button data-act="dnsq:ldns-b">Query from LDNS B</button></div>`;
-  $("#wip").innerHTML = h;
-  renderWipLive();
+
+/* ---------- config text ---------- */
+function confText() {
+  const tm = r => r === "inherit" ? "inherit" : r === "inside" ? "inside-datacenter" : r === "outside" ? "outside-datacenter" : r === "any" ? "any-available" : r === "none" ? "none" : "pool";
+  const ppool = (pref, fb) => [pref, fb].find(r => r.startsWith("pool:"));
+  const proberLines = n => { const L = [`    prober-fallback ${tm(n.fb)}`, `    prober-preference ${tm(n.pref)}`], pp = ppool(n.pref, n.fb); if (pp) L.push(`    prober-pool /Common/${pp.slice(5)}`); return L; };
+  /* each real virtual server gets an internal object and an external one with a translation address */
+  const vsLines = id => { const v = N[id]; return [`        ${v.vsName} { destination ${v.ip}:${v.port} }`, `        ${v.vsName}_ext { destination ${v.pub}:${v.port} translation-address ${v.ip} translation-port ${v.port} }`]; };
+  const L = [];
+  for (const d of Object.values(DC)) L.push(`gtm datacenter /Common/${d.name} {`, ...proberLines(d), `}`);
+  for (const p of Object.values(POOLS)) {
+    L.push(`gtm prober-pool /Common/${p.name} {`, `    load-balancing-mode ${p.method === "ga" ? "global-availability" : "round-robin"}`, `    members {`, ...p.members.map((m, i) => `        /Common/${m.id} { order ${i}${m.en ? "" : " disabled"} }`), `    }`, `}`);
+  }
+  for (const b of BIGIPS) {
+    const n = N[b], vss = VSS.filter(v => N[v].server === b);
+    L.push(`gtm server /Common/${b} {`, `    datacenter /Common/${DC[n.dc].name}`, `    devices {`, `        ${b} { addresses { ${n.ip} { } } }`, `    }`, `    monitor /Common/bigip`, `    product bigip`);
+    if (!n.dns) L.push(...proberLines(n));
+    if (vss.length) L.push(`    virtual-servers {`, ...vss.flatMap(vsLines), `    }`);
+    L.push(`}`);
+  }
+  for (const id of GENS) {
+    const gn = N[id];
+    L.push(`gtm server /Common/${id} {`, `    addresses { ${gn.ip} { device-name ${id} } }`, `    datacenter /Common/${DC[gn.dc].name}`, `    product generic-host`, ...proberLines(gn), `    virtual-servers {`, ...vsLines(id), `    }`, `}`);
+  }
+  for (const m of Object.values(MONS)) {
+    if (m.builtin) continue;
+    L.push(`gtm monitor ${m.type} /Common/${m.name} {`, `    defaults-from /Common/${m.type}`, `    destination *:*`, `    interval ${m.interval}`);
+    if (isWeb(m)) L.push(`    recv "${m.recv}"`, `    send "${m.send}"`);
+    L.push(`    timeout ${m.timeout}`, `}`);
+  }
+  for (const W of Object.values(WIPS)) for (const side of ["int", "ext"]) {
+    L.push(`gtm pool a /Common/${W.pool}_${side} {`, `    alternate-mode round-robin`, `    fallback-mode return-to-dns`, `    load-balancing-mode ${TMSH_LB[W.method]}`, `    members {`, ...W.members.map((v, i) => `        /Common/${N[v].server}:/Common/${N[v].vsName}${side === "ext" ? "_ext" : ""} { member-order ${i} }`), `    }`);
+    if (W.mons.length) L.push(`    monitor ${W.mons.map(m => "/Common/" + m).join(" and ")}`);
+    L.push(`    ttl ${POOL_TTL}`, `}`);
+  }
+  L.push(`gtm region /Common/internal_nets {`, `    region-members {`, `        subnet ${INTERNAL_NET} { }`, `    }`, `}`);
+  for (const side of ["int", "ext"]) L.push(`gtm region /Common/${side === "int" ? "internal" : "external"}_pools {`, `    region-members {`, ...WKEYS.map(w => `        pool /Common/${WIPS[w].pool}_${side} { }`), `    }`, `}`);
+  L.push(`gtm topology ldns: region /Common/internal_nets server: region /Common/internal_pools {`, `    score 100`, `}`, `gtm topology ldns: not region /Common/internal_nets server: region /Common/external_pools {`, `    score 100`, `}`);
+  for (const W of Object.values(WIPS)) L.push(`gtm wideip a /Common/${W.name} {`, `    pool-lb-mode topology`, `    pools {`, `        /Common/${W.pool}_int { order 0 }`, `        /Common/${W.pool}_ext { order 1 }`, `    }`, `}`);
+  return L.join("\n");
 }
-function renderWipLive() {
-  const vg = S.viewGtm, b = $("#wiplive"); if (!b) return;
-  b.innerHTML = `<span class="lbl">Members as seen by gtmd@${vg}</span>` + MEM.map(m => `<span class="pill">${N[vg].up ? `<span class="dot ${DOTC[VIEW[vg][m.id].st]}"></span>` : `<span class="dot k"></span>`}${m.id} · ${m.ip}:${m.port}</span>`).join("");
-  document.querySelectorAll("[data-pok]").forEach(d => d.className = "dot " + (proberOk(d.dataset.pok) ? "g" : "r"));
+function zoneText() {
+  const pad = s => s.padEnd(9);
+  const zone = view => {
+    const pub = view === "external", l = g => pub ? N[g].pub : N[g].listener;
+    return [
+      `; ---- /var/named/db.chala.info.${view}`,
+      "$ORIGIN chala.info.",
+      `$TTL ${BIND_TTL}`,
+      "@        IN SOA  ns1.chala.info. hostmaster.chala.info. ( 2026102701 3600 600 1209600 300 )",
+      "         IN NS   ns1.chala.info.",
+      `${pad("ns1")}IN A    ${N.bind.ip}`,
+      "",
+      `; gtm.chala.info is delegated to the BIG-IP DNS listeners (${pub ? "public, NATed at each edge" : "internal addresses"})`,
+      `${pad("gtm")}IN NS   gtm-nyc.chala.info.`,
+      `${pad("gtm")}IN NS   gtm-sea.chala.info.`,
+      `${pad("gtm-nyc")}IN A    ${l("gtm-nyc")}`,
+      `${pad("gtm-sea")}IN A    ${l("gtm-sea")}`,
+      "",
+      "; each app is a CNAME into the delegated subdomain, where a wide IP answers",
+      ...WKEYS.map(w => `${pad(w)}IN CNAME ${WIPS[w].name}.`),
+      ...(pub ? [] : ["", "; internal-only records", `${pad("intranet")}IN A    10.1.50.10`]),
+    ];
+  };
+  return [
+    "// ---- /etc/named.conf (excerpt)",
+    `acl internal_nets { ${INTERNAL_NET}; };`,
+    "",
+    'view "internal" {',
+    "    match-clients { internal_nets; };",
+    "    recursion no;",
+    '    zone "chala.info" { type master; file "db.chala.info.internal"; };',
+    "};",
+    'view "external" {',
+    "    match-clients { any; };",
+    "    recursion no;",
+    '    zone "chala.info" { type master; file "db.chala.info.external"; };',
+    "};",
+    "",
+    ...zone("internal"),
+    "",
+    ...zone("external"),
+  ].join("\n");
 }
 
 /* ---------- console ---------- */
-const TABS = [["log", "/var/log/gtm"], ["iquery", "show gtm iquery"], ["mon", "monitor instances"], ["path", "show gtm path"], ["dns", "DNS answers"], ["iqdump", "iqdump"]];
+const TABS = [["log", "/var/log/gtm"], ["dns", "DNS answers"], ["mon", "monitor instances"], ["iquery", "show gtm iquery"], ["path", "show gtm path"], ["conf", "bigip_gtm.conf"], ["zone", "named.conf / zones"], ["iqdump", "iqdump"]];
 function renderTabs() {
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" data-tab="${k}">${l}</button>`).join("");
   const bar = $("#cbar");
-  if (S.tab === "log") bar.innerHTML = `<span>Combined log from all four BIG-IPs, newest first</span>`;
+  if (S.tab === "log") bar.innerHTML = `<span>Combined log from the BIG-IPs, newest first</span>`;
   else if (S.tab === "iquery") bar.innerHTML = `<span>root@(${S.viewGtm})(cfg-sync In Sync)(Active)(/Common)(tmos)# show gtm iquery</span>`;
-  else if (S.tab === "mon") bar.innerHTML = `<span>Which big3d probes each monitor instance, and what each gtmd believes</span>`;
+  else if (S.tab === "mon") bar.innerHTML = `<span>One instance per pool member per monitor: who runs it, the last probe, and what each gtmd believes</span>`;
   else if (S.tab === "path") bar.innerHTML = `<span>Path metrics learned from big3d probes of each LDNS (TTL ${PATH_TTL} s)</span>`;
-  else if (S.tab === "dns") bar.innerHTML = `<span>Answers for www.example.com, newest first</span>`;
+  else if (S.tab === "dns") bar.innerHTML = `<span>Lookups of appN.chala.info, newest first, with the hops each one took</span>`;
+  else if (S.tab === "conf") bar.innerHTML = `<span>root@(gtm-nyc)(cfg-sync In Sync)(Active)(/Common)(tmos)# list gtm (simplified)</span>`;
+  else if (S.tab === "zone") bar.innerHTML = `<span>ns1.chala.info: split-horizon views and their zone files</span>`;
   else bar.innerHTML = `<label for="iqdSel">[root@${CONN[S.iqd].g}:Active] # iqdump</label><select id="iqdSel">${Object.values(CONN).map(c => `<option value="${c.key}"${c.key === S.iqd ? " selected" : ""}>${N[c.b].ip} (gtmd@${c.g} → big3d@${c.b})</option>`).join("")}</select><span>simplified XML</span>`;
   const sel = $("#iqdSel"); if (sel) sel.onchange = e => { S.iqd = e.target.value; renderTabs(); renderConsole(); };
 }
 function renderConsole() {
   const b = $("#cbody"); let h = "";
   if (S.tab === "log") {
-    h = LOGS.slice(0, 200).map(l => `<div class="logline sev-${l.sev}"><span class="h">${ts(l.t)} ${l.host}</span> ${l.sev} ${l.proc}[${(PID[l.host] && PID[l.host][l.proc]) || 3311}]: ${l.code ? l.code + ": " : ""}${esc(l.msg)}</div>`).join("") || `<div class="logline">No log lines yet. Press Play.</div>`;
+    h = LOGS.slice(0, 200).map(l => `<div class="logline sev-${l.sev}"><span class="h">${ts(l.t)} ${l.host}</span> ${l.sev} ${l.proc}[${(PID[l.host] && PID[l.host][l.proc]) || 3311}]: ${l.code ? l.code + ": " : ""}${esc(l.msg)}</div>`).join("") || `<div class="logline">No log lines yet. Press Start.</div>`;
   } else if (S.tab === "iquery") {
     const g = S.viewGtm;
     h = `<table class="t"><thead><tr><th>Gtm::IQuery</th><th>Server</th><th>Data Center</th><th>iQuery State</th><th>Query Reconnects</th><th>Bits In</th><th>Bits Out</th><th>Backlogs</th><th>Cert Expiration Date</th></tr></thead><tbody>`;
     for (const bb of BIGIPS) { const c = conn(g, bb); h += `<tr><td>${N[bb].ip}</td><td>/Common/${bb}</td><td>/Common/${DC[N[bb].dc].name}</td><td><span class="pill"><span class="dot ${c.st === "connected" ? "g" : c.st === "ssl" ? "r" : c.st === "connecting" ? "y" : "k"}"></span>${N[g].up ? (c.st === "connected" ? "connected" : c.st === "ssl" ? "not connected (SSL error)" : c.st === "connecting" ? "connecting" : "not connected") : "—"}</span></td><td>${c.rec}</td><td>${fmtBits(c.bin)}</td><td>${fmtBits(c.bout)}</td><td>0</td><td>${c.cert ? "untrusted" : "10/12/36 09:14:02"}</td></tr>`; }
-    h += `</tbody></table>`;
+    h += `</tbody></table><div class="small" style="margin-top:6px">${GENS.join(" and ")} are not listed: a generic host runs no big3d, so there is no iQuery connection to it.</div>`;
   } else if (S.tab === "mon") {
-    h = `<table class="t"><thead><tr><th>Monitor instance</th><th>Server</th><th>Prober (big3d)</th><th>Why this prober</th>${GTMS.map(g => `<th>gtmd@${g}</th>`).join("")}</tr></thead><tbody>`;
-    for (const m of MEM) {
-      const pr = m.mon === "bigip" ? `${m.server} (self-report)` : m.prober ? `${m.prober} · ${N[m.prober].ip}` : "none";
-      const why = m.mon === "bigip" ? "bigip monitor: the LTM's big3d reports its own VS status" : (m.selWhy || "not run yet");
-      h += `<tr><td>/Common/${m.mon} ${m.ip}:${m.port}</td><td>/Common/${m.server}</td><td>${pr}</td><td class="wrap">${esc(why)}</td>${GTMS.map(g => { const v = VIEW[g][m.id]; return `<td>${N[g].up ? statusPill(v.st) + `<div class="small">${esc(v.why)}</div>` : "device off"}</td>`; }).join("")}</tr>`;
+    h = `<table class="t"><thead><tr><th>Monitor instance</th><th>Pool member</th><th>Run by (big3d)</th><th>Why this prober</th><th>Last probe</th>${GTMS.map(g => `<th>gtmd@${g}</th>`).join("")}</tr></thead><tbody>`;
+    for (const i of INST) {
+      const vs = N[i.vs], bigip = i.mon === "bigip";
+      const pr = bigip ? `${vs.server} (self-report)` : i.prober ? `${i.prober} · ${N[i.prober].ip}` : "none";
+      const why = bigip ? "bigip monitor: the LTM's big3d reports its own VS status" : (i.selWhy || "not run yet");
+      h += `<tr><td>/Common/${i.mon} ${vs.ip}:${vs.port}</td><td>${WIPS[vs.wip].pool} / ${vs.id}</td><td>${pr}</td><td class="wrap">${esc(why)}</td><td class="wrap">${bigip ? "—" : esc(i.last || "—")}</td>${GTMS.map(g => { const v = VIEW[g][i.key]; return `<td>${N[g].up ? statusPill(v.st) + `<div class="small">${esc(v.why)}</div>` : "device off"}</td>`; }).join("")}</tr>`;
     }
     h += `</tbody></table>`;
   } else if (S.tab === "path") {
@@ -941,12 +1370,16 @@ function renderConsole() {
     let any = false;
     for (const g of GTMS) for (const l of LDNS) for (const d of ["nyc", "sea"]) { const p = PATHS[g][l][d]; if (!p) continue; any = true; h += `<tr><td>gtmd@${g}</td><td>${N[l].ip}</td><td>/Common/${DC[d].name}</td><td>${p.rtt} ms</td><td>${p.from} (DNS_DOT)</td><td>${Math.floor(S.now - p.t)} s</td></tr>`; }
     h += `</tbody></table>`;
-    if (!any) h = `<div class="logline">No path metrics yet. Set the wide IP method to Round Trip Times (or run the RTT scenario) and gtmd will ask big3d to probe each LDNS.</div>`;
+    if (!any) h = `<div class="logline">No path metrics yet. A lookup for a Round Trip Times pool makes gtmd ask big3d to probe each LDNS.</div>`;
   } else if (S.tab === "dns") {
-    h = `<table class="t"><thead><tr><th>Time</th><th>LDNS</th><th>Answered by</th><th>Answer</th><th>Method</th><th>Reason</th></tr></thead><tbody>`;
-    h += DNSLOG.map(d => `<tr><td>${ts(d.t)}</td><td>${N[d.ldns].ip}</td><td>${d.g}${d.retried ? " (retry)" : ""}</td><td><b>${d.ans}</b>${d.member ? ` <span class="small">${d.member}</span>` : ""}</td><td>${d.method}</td><td class="wrap">${esc(d.why)}</td></tr>`).join("");
+    h = `<table class="t"><thead><tr><th>Time</th><th>Name</th><th>LDNS</th><th>Resolution path</th><th>Answer</th><th>Method</th><th>Reason</th></tr></thead><tbody>`;
+    h += DNSLOG.map(d => `<tr><td>${ts(d.t)}</td><td>${fqdn(d.wk)}</td><td>${N[d.ldns].ip}</td><td>${esc(d.path)}</td><td><b>${d.ans}</b>${d.member ? ` <span class="small">${d.member}</span>` : ""}</td><td>${d.method}</td><td class="wrap">${esc(d.why)}</td></tr>`).join("");
     h += `</tbody></table>`;
-    if (!DNSLOG.length) h = `<div class="logline">Waiting for the first query.</div>`;
+    if (!DNSLOG.length) h = `<div class="logline">Waiting for the first lookup.</div>`;
+  } else if (S.tab === "conf") {
+    h = `<pre class="xml">${esc(confText())}</pre>`;
+  } else if (S.tab === "zone") {
+    h = `<pre class="xml">${esc(zoneText())}</pre>`;
   } else {
     const c = CONN[S.iqd];
     h = c.msgs.map(m => `<pre class="xml"><span class="meta">${ts(m.t)}  ${m.dir}  ${N[c.g].ip} ⇄ ${N[c.b].ip}:4353</span>\n${esc(m.xml)}</pre>`).join("") || `<div class="logline">No messages on this connection${c.st !== "connected" ? ` (state: ${c.st})` : " yet"}.</div>`;
@@ -957,9 +1390,9 @@ function renderConsole() {
 /* ---------- chrome ---------- */
 function renderChrome() {
   $("#clock").textContent = ts(S.now);
-  $("#play").textContent = S.playing ? "Pause" : "Play";
+  $("#play").textContent = HINT ? "Next ▸" : S.playing ? "Pause" : S.started ? "Play" : "Start";
   $("#play").setAttribute("aria-pressed", String(S.playing));
-  $("#speed").innerHTML = SPEEDS.map(s => `<button data-speed="${s}" aria-pressed="${S.speed === s}">${s}×</button>`).join("");
+  $("#speed").innerHTML = SPEEDS.map(s => `<button data-speed="${s}" aria-pressed="${S.speed === s}"${s === 1 ? ' title="Real time"' : ""}>${s}×</button>`).join("");
   $("#viewAs").innerHTML = GTMS.map(g => `<button data-view="${g}" aria-pressed="${S.viewGtm === g}">${g}</button>`).join("");
   $("#legend").innerHTML = Object.entries(TYPES).map(([k, l]) => `<label><input type="checkbox" data-show="${k}" ${S.show[k] ? "checked" : ""}><span class="sw" style="background:var(--${k})"></span>${l}</label>`).join("");
 }
@@ -968,14 +1401,15 @@ function renderScen() {
   const s = SCEN[S.scen];
   $("#scenText").innerHTML = `<h2>${s.title}</h2><p>${s.text}</p><span class="lbl">What to watch</span><ul>${s.watch.map(w => `<li>${w}</li>`).join("")}</ul>${s.fix ? `<p class="fix">${s.fix}</p>` : ""}`;
 }
-function renderAll() { renderChrome(); renderSvg(); renderInspector(); renderPools(); renderWip(); renderTabs(); renderConsole(); }
+function renderAll() { renderChrome(); renderSvg(); renderInspector(); renderWip(); renderMons(); renderPools(); renderTabs(); renderConsole(); }
 function render() { renderSvg(); renderInspector(); renderPools(); renderWipLive(); }
 
 /* ---------- events ---------- */
 function select(spec) { const [k, id] = spec.split(":"); S.sel = { k, id }; renderSvg(); renderInspector(); }
 $("#topo").addEventListener("click", e => { const t = e.target.closest("[data-sel]"); if (t) select(t.dataset.sel); });
 $("#topo").addEventListener("keydown", e => { if (e.key !== "Enter" && e.key !== " ") return; const t = e.target.closest("[data-sel]"); if (t) { e.preventDefault(); select(t.dataset.sel); } });
-$("#play").onclick = () => { S.playing = !S.playing; renderChrome(); };
+$("#hintPop").addEventListener("click", e => { const b = e.target.closest("[data-hint]"); if (b) closeHint(b.dataset.hint === "skip"); });
+$("#play").onclick = () => { if (HINT) { closeHint(false); return; } S.playing = !S.playing; S.started = true; renderChrome(); };
 $("#reset").onclick = () => runScenario(S.scen);
 $("#scenRun").onclick = () => runScenario($("#scenSel").value);
 $("#scenSel").onchange = e => { S.scen = e.target.value; renderScen(); };
@@ -984,54 +1418,99 @@ $("#viewAs").addEventListener("click", e => { const b = e.target.closest("[data-
 $("#legend").addEventListener("change", e => { const k = e.target.dataset.show; if (k) { S.show[k] = e.target.checked; renderSvg(); } });
 $("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) { S.tab = b.dataset.tab; renderTabs(); renderConsole(); } });
 
+function nudgeCustom() { for (const i of INST) if (i.mon !== "bigip") i.next = Math.min(i.next, S.now + 2 + Math.random() * 3); }
 function act(a) {
   const [k, x, y] = a.split(":");
   if (k === "power") {
     const n = N[x]; n.up = !n.up;
-    if (n.up) { n.big3d = true; if (n.dns) for (const m of MEM) VIEW[x][m.id] = { st: "unknown", lastOk: S.now, why: "Checking", from: "" }; log(x, "notice", "shell", "(lab) device powered on"); }
+    if (n.up) { n.big3d = true; if (n.dns) for (const i of INST) VIEW[x][i.key] = { st: "unknown", lastOk: S.now, why: "Checking", from: "", lastFail: "" }; log(x, "notice", "shell", "(lab) device powered on"); }
     else log(GTMS.find(g => g !== x && N[g].up) || x, "notice", "gtmd", `(lab) ${x} powered off`);
   } else if (k === "big3d") { const n = N[x]; n.big3d = !n.big3d; log(x, "notice", "bigstart", n.big3d ? "big3d started (bigstart start big3d)" : "big3d stopped (bigstart stop big3d)"); }
-  else if (k === "vs") { const m = mem(x); m.vsUp = !m.vsUp; log(m.server, m.vsUp ? "notice" : "err", "tmm", m.vsUp ? `Pool /Common/pool_${m.id.slice(3)} member 10.${m.dc === "nyc" ? 1 : 2}.40.21:8443 monitor status up` : `No members available for pool /Common/pool_${m.id.slice(3)}`, m.vsUp ? "01070727:5" : "01010028:3"); }
-  else if (k === "host") { const n = N[x]; n.up = !n.up; log(x === "app-sea-01" ? "gtm-sea" : "gtm-nyc", "notice", "shell", `(lab) web service on ${x} ${n.up ? "started" : "stopped"}`); }
+  else if (k === "vsfail") {
+    const n = N[x]; n.vsUp = !n.vsUp;
+    if (n.kind === "generic") log("gtm-" + n.dc, "notice", "shell", `(lab) web service on ${x} ${n.vsUp ? "started" : "stopped"}`);
+    else log(n.server, n.vsUp ? "notice" : "err", "tmm", n.vsUp ? `Pool /Common/${n.wip}_pool member 10.${n.dc === "nyc" ? 1 : 2}.40.21:8443 monitor status up` : `No members available for pool /Common/${n.wip}_pool`, n.vsUp ? "01070727:5" : "01010028:3");
+  }
+  else if (k === "app") { const n = N[x]; n.appOk = !n.appOk; log(n.kind === "generic" ? "gtm-" + n.dc : n.server, "notice", "shell", `(lab) application behind ${x} ${n.appOk ? "restored, returns HTTP 200" : "now returns HTTP 503 Service Unavailable"}`); }
+  else if (k === "bind") { N.bind.up = !N.bind.up; log("bind", "notice", "named", N.bind.up ? "starting BIND 9.18 (rndc start)" : "shutting down (rndc stop)"); }
+  else if (k === "tab") { S.tab = x; renderTabs(); renderConsole(); $(".console").scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
+  else if (k === "pick") { S.sel = { k: "node", id: x }; }
   else if (k === "cert") { const c = CONN[x]; c.cert = !c.cert; if (!c.cert) { c.retry = S.now; log(c.g, "notice", "shell", `bigip_add ${N[c.b].ip}: device certificate added to /config/gtm/server.crt`); } else log(c.b, "notice", "shell", "(lab) device certificate replaced without re-running bigip_add"); }
   else if (k === "iqd") { S.iqd = x; S.tab = "iqdump"; renderTabs(); renderConsole(); $(".console").scrollIntoView({ behavior: "smooth", block: "nearest" }); }
   else if (k === "wan") { S.wan = !S.wan; log("gtm-nyc", "notice", "gtmd", `(lab) WAN link dc_nyc ↔ dc_sea ${S.wan ? "restored" : "down"}`); }
   else if (k === "viewas") { S.viewGtm = x; renderChrome(); renderTabs(); }
   else if (k === "flush") { for (const g of GTMS) PATHS[g][x] = {}; PENDING[x] = false; log("gtm-nyc", "notice", "tmsh", `delete gtm path ${N[x].ip}`); }
-  else if (k === "dnsq") { dnsQuery(x); }
+  else if (k === "flushc") { CACHE[x] = { ns: 0, cname: {}, a: {} }; }
+  else if (k === "dnsq") { dnsQuery(x, y); }
+  else if (k === "guide") { dnsQuery(x, y, true); }
   else if (k === "pmup" || k === "pmdn") { const p = POOLS[x], i = +y, j = k === "pmup" ? i - 1 : i + 1; [p.members[i], p.members[j]] = [p.members[j], p.members[i]]; reassignAll(); }
   else if (k === "pmdel") { POOLS[x].members.splice(+y, 1); reassignAll(); }
+  else if (k === "monadd") {
+    const d = S.draft, name = d.name.trim() || `${d.type}_custom_${Object.keys(MONS).length}`;
+    if (!/^[A-Za-z][\w.-]{0,40}$/.test(name)) S.err = "Use a name that starts with a letter and has only letters, digits, _ . or -.";
+    else if (MONS[name]) S.err = `/Common/${name} already exists.`;
+    else {
+      const interval = Math.max(5, Math.round(+d.interval) || 30), timeout = Math.max(5, Math.round(+d.timeout) || 120);
+      MONS[name] = { name, type: d.type, builtin: false, interval, timeout, send: isWeb(d) ? d.send : "", recv: isWeb(d) ? d.recv : "" };
+      S.err = timeout <= interval ? `Created. Note: timeout should be longer than the interval (F5 suggests 3 × interval + 1).` : "";
+      log("gtm-nyc", "notice", "mcpd", `(lab) create gtm monitor ${d.type} /Common/${name} interval ${interval} timeout ${timeout}`);
+      S.draft = draftFor(d.type);
+    }
+    renderMons(); renderWip(); return;
+  } else if (k === "mondel") {
+    delete MONS[x];
+    for (const W of Object.values(WIPS)) W.mons = W.mons.filter(m => m !== x);
+    syncInst(); log("gtm-nyc", "notice", "mcpd", `(lab) delete gtm monitor /Common/${x}`);
+    renderMons();
+  }
   render(); renderWip(); renderConsole();
 }
 function setv(spec, val, checked) {
   const [k, x, y] = spec.split(":");
-  if (k === "pref") N[x].pref = val;
-  else if (k === "fb") N[x].fb = val;
-  else if (k === "dcpref") DC[x].pref = val;
-  else if (k === "dcfb") DC[x].fb = val;
-  else if (k === "poolmethod") POOLS[x].method = val;
-  else if (k === "pmen") POOLS[x].members[+y].en = checked;
-  else if (k === "padd") { if (!val) return; POOLS[x].members.push({ id: val, en: true }); }
-  else if (k === "wipmethod") { WIP.method = val; }
-  else if (k === "dnson") { S.dnsOn = checked; return; }
-  if (k !== "wipmethod") { reassignAll(); for (const m of MEM) if (m.mon === "http") m.next = Math.min(m.next, S.now + 2 + Math.random() * 3); log("gtm-nyc", "notice", "mcpd", `(lab) configuration changed: ${k} ${x} = ${val ?? checked}; monitor instances reassigned`); }
+  if (k === "dnson") { S.dnsOn = checked; return; }
+  if (k === "newtype") { S.draft = { ...draftFor(val), name: S.draft.name, interval: S.draft.interval, timeout: S.draft.timeout }; renderMons(); return; }
+  if (k === "msend" || k === "mrecv") {
+    MONS[x][k === "msend" ? "send" : "recv"] = val;
+    log("gtm-nyc", "notice", "mcpd", `(lab) modify gtm monitor ${MONS[x].type} /Common/${x} ${k === "msend" ? "send" : "recv"} "${val}"`);
+    renderConsole(); return;
+  }
+  if (k === "wmethod") { WIPS[x].method = val; log("gtm-nyc", "notice", "mcpd", `(lab) modify gtm pool a /Common/${WIPS[x].pool} load-balancing-mode ${TMSH_LB[val]}`); }
+  else if (k === "wmon") {
+    const W = WIPS[x];
+    if (W.generic && y === "bigip") return;
+    W.mons = Object.keys(MONS).filter(m => m === y ? checked : W.mons.includes(m));
+    syncInst();
+    log("gtm-nyc", "notice", "mcpd", `(lab) modify gtm pool a /Common/${W.pool} monitor ${W.mons.length ? W.mons.map(m => "/Common/" + m).join(" and ") : "none"}`);
+    renderMons();
+  } else {
+    if (k === "pref") N[x].pref = val;
+    else if (k === "fb") N[x].fb = val;
+    else if (k === "dcpref") DC[x].pref = val;
+    else if (k === "dcfb") DC[x].fb = val;
+    else if (k === "poolmethod") POOLS[x].method = val;
+    else if (k === "pmen") POOLS[x].members[+y].en = checked;
+    else if (k === "padd") { if (!val) return; POOLS[x].members.push({ id: val, en: true }); }
+    reassignAll(); nudgeCustom();
+    log("gtm-nyc", "notice", "mcpd", `(lab) configuration changed: ${k} ${x} = ${val ?? checked}; monitor instances reassigned`);
+  }
   render(); renderWip(); renderConsole();
 }
-document.querySelector(".side").addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b) act(b.dataset.act); });
-document.querySelector(".side").addEventListener("change", e => { const t = e.target; if (t.dataset.set) setv(t.dataset.set, t.value, t.checked); });
+const DRAFT_FIELDS = { "nm-name": "name", "nm-send": "send", "nm-recv": "recv", "nm-interval": "interval", "nm-timeout": "timeout" };
+const side = document.querySelector(".side");
+side.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b) act(b.dataset.act); });
+side.addEventListener("change", e => { const t = e.target; if (t.dataset.set) setv(t.dataset.set, t.value, t.checked); });
+side.addEventListener("input", e => { const f = DRAFT_FIELDS[e.target.id]; if (f) S.draft[f] = e.target.value; });
 
-/* ---------- boot ---------- */
-fresh(); buildSvg(); renderScen(); renderAll();
+/* ---------- boot: load the default scenario paused ---------- */
+fresh(); buildSvg(); runScenario(S.scen);
 let last = performance.now(), lastUi = 0;
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (S.playing) { S.now += dt * SIM_RATE * S.speed; step(); }
   drawPackets();
-  if (now - lastUi > 300) { lastUi = now; $("#clock").textContent = ts(S.now); renderSvg(); renderLive(); renderWipLive(); if (!document.querySelector("#cbody:hover") || S.tab !== "log") renderConsole(); }
+  if (now - lastUi > 300) { lastUi = now; $("#clock").textContent = ts(S.now); renderSvg(); renderLive(); renderWipLive(); positionHint(); if (!document.querySelector("#cbody:hover") || S.tab !== "log") renderConsole(); }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 })();
 </script>
-
-</html>
