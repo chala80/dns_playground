@@ -59,6 +59,15 @@ header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:spac
 .seg button{border:0;border-radius:0;border-right:1px solid var(--line);padding:5px 9px}
 .seg button:last-child{border-right:0}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.pagetabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.pagetabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 14px;font-family:var(--f-disp);font-stretch:85%;font-weight:700;font-size:15px;color:var(--muted);white-space:nowrap}
+.pagetabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.page{display:flex;flex-direction:column;gap:14px}
+.cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:14px;align-items:start}
+.cfg-intro{margin:0;color:var(--muted);max-width:90ch}
+.ptable{display:grid;grid-template-columns:max-content minmax(0,1fr) minmax(0,1fr);gap:6px 8px;align-items:center;font-size:13px}
+.ptable .ph{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.ptable b{font-family:var(--f-mono);font-size:12px;font-weight:600}
 .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
 
 .scen{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:16px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
@@ -203,6 +212,13 @@ code{font-family:var(--f-mono);font-size:12px}
     </div>
   </header>
 
+  <nav class="pagetabs" role="tablist" aria-label="Sections" id="pagetabs">
+    <button role="tab" data-page="lab" aria-selected="true">Lab</button>
+    <button role="tab" data-page="config" aria-selected="false">Configuration</button>
+    <button role="tab" data-page="learn" aria-selected="false">Concepts</button>
+  </nav>
+
+  <div class="page" id="page-lab">
   <section class="scen" aria-label="Scenario">
     <div class="pick">
       <span class="lbl">Scenario</span>
@@ -231,8 +247,6 @@ code{font-family:var(--f-mono);font-size:12px}
     <aside class="side">
       <section class="card sec" id="inspector"></section>
       <section class="card sec" id="wip"></section>
-      <section class="card sec" id="mons"></section>
-      <section class="card sec" id="pools"></section>
     </aside>
   </div>
 
@@ -242,6 +256,21 @@ code{font-family:var(--f-mono);font-size:12px}
     <div class="cbody" id="cbody"></div>
   </section>
 
+  </div>
+
+  <div class="page" id="page-config" hidden>
+    <p class="cfg-intro">Changes here apply to the running lab straight away. Switch back to the Lab tab to watch the effect; the simulation keeps running while you're here.</p>
+    <div class="cfg">
+      <section class="card sec" id="wipcfg"></section>
+      <section class="card sec" id="mons"></section>
+      <div class="side">
+        <section class="card sec" id="pools"></section>
+        <section class="card sec" id="probecfg"></section>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-learn" hidden>
   <section class="notes">
     <div class="card">
       <h4>Split DNS</h4>
@@ -288,6 +317,7 @@ code{font-family:var(--f-mono);font-size:12px}
       <p>1× is real time and uses BIG-IP defaults: iQuery heartbeat 10 s, bigip monitor 30 s / 90 s, custom monitors 30 s / 120 s, path TTL 2400 s, pool TTL 30 s. Use 5× to 20× to skip ahead. Packets in flight are slowed down so you can see them; real iQuery and DNS messages take milliseconds. The LDNS is assumed to already know where chala.info lives, so root and .info lookups are skipped. Internal and external virtual server objects share one status per real server here; on a real system each is monitored separately. Log lines, iQuery XML and the config tabs are modeled on real output but simplified, so check a real device for exact text. Real CLI to try: <code>tmsh show gtm iquery</code>, <code>tmsh show gtm pool a</code>, <code>dig app1.chala.info +trace</code>, <code>iqdump 10.1.10.10</code>.</p>
     </div>
   </section>
+  </div>
 </div>
 
 <script>
@@ -336,7 +366,7 @@ const addrFor = (m, ldns) => isInt(ldns) ? m.ip : m.pub;
 const lsnr = (g, ldns) => isInt(ldns) ? N[g].listener : N[g].pub;
 const ldnsName = id => `LDNS ${id.slice(-1).toUpperCase()} (${N[id].internal ? "internal" : "ISP"})`;
 
-let S = { speed: 1, playing: false, started: false, viewGtm: "gtm-nyc", sel: { k: "node", id: "client-a" }, tab: "log", show: { iq: true, result: true, probe: true, path: true, dns: true }, iqd: "gtm-sea>ltm-nyc", dnsOn: true, scen: "dns", draft: draftFor("http"), err: "" };
+let S = { speed: 1, playing: false, started: false, viewGtm: "gtm-nyc", sel: { k: "node", id: "client-a" }, tab: "log", show: { iq: true, result: true, probe: true, path: true, dns: true }, iqd: "gtm-sea>ltm-nyc", dnsOn: true, scen: "dns", draft: draftFor("http"), err: "", page: "lab" };
 let N, DC, POOLS, WIPS, MONS, INST, CONN, VIEW, PATHS, PENDING, CACHE, TIMERS, LOGS, DNSLOG, PK, FL, RR, HINT = null;
 
 /* ---------- state ---------- */
@@ -785,6 +815,7 @@ function guideStep(q, node, html, then) {
   S.playing = false; renderChrome(); showHint();
 }
 function showHint() {
+  if (S.page !== "lab") setPage("lab");
   const pop = $("#hintPop");
   pop.innerHTML = `<div class="hs">Step ${HINT.q.n} · ${fqdn(HINT.q.wk)} · ${isInt(HINT.q.ldns) ? "internal" : "external"}</div><p>${HINT.html}</p><div class="acts"><button class="primary" data-hint="next">${HINT.then ? "Next ▸" : HINT.q.after ? "Next lookup ▸" : "Done"}</button>${HINT.then ? `<button data-hint="skip">Skip hints</button>` : ""}</div>`;
   pop.hidden = false;
@@ -845,7 +876,7 @@ const SCEN = {
   custom: {
     title: "Add a custom HTTP monitor",
     text: "pool_app1 now uses bigip and a custom HTTP monitor, /Common/http_app1_health, which sends GET /health to each app1 virtual server and expects 200 OK. A custom monitor needs a prober: a big3d chosen by the server's prober preference, here Inside Data Center.",
-    watch: ["Orange GET /health probes go from a BIG-IP in the same data center to each app1 virtual server, and 200 OK comes back.", "The prober's big3d sends the result to both gtmds (teal). The probe is sent once, but every gtmd learns the result.", "Dashed orange lines show which big3d probes each instance.", "Open the monitor instances tab: app1 members have two instances each, and both must be up.", "In the Health monitors card, create your own monitor, then tick it on another wide IP's pool."],
+    watch: ["Orange GET /health probes go from a BIG-IP in the same data center to each app1 virtual server, and 200 OK comes back.", "The prober's big3d sends the result to both gtmds (teal). The probe is sent once, but every gtmd learns the result.", "Dashed orange lines show which big3d probes each instance.", "Open the monitor instances tab: app1 members have two instances each, and both must be up.", "In the Configuration tab, create your own monitor, then tick it on another wide IP's pool."],
     sel: "vs_app1_nyc",
     setup() { addApp1Monitor(); },
   },
@@ -853,7 +884,7 @@ const SCEN = {
     title: "Application failure the bigip monitor misses",
     text: "pool_app1 uses bigip and the custom HTTP monitor. pool_app2 (Round Robin here) uses only bigip. At 14:02:30 the application behind both Seattle virtual servers starts returning 503 Service Unavailable. The LTM still sees its pool members up, so both virtual servers stay green on the LTM.",
     watch: ["ltm-sea's big3d keeps reporting vs_app2_sea green, so gtmd keeps handing it out for app2.chala.info (10.2.20.20 inside, 203.0.113.120 outside) even though users get errors.", "The GET /health probe to vs_app1_sea gets 503 back. The receive string 200 OK is not found.", "After the 120 s timeout both gtmds mark vs_app1_sea red, and app1.chala.info resolves only to vs_app1_nyc (10.1.20.10 inside, 203.0.113.10 outside)."],
-    fix: "Tick http_app1_health on app2 and watch vs_app2_sea go red too. Or click a Seattle virtual server and restore the application.",
+    fix: "In the Configuration tab, tick http_app1_health on app2 and watch vs_app2_sea go red too. Or click a Seattle virtual server and restore the application.",
     sel: "vs_app1_sea",
     setup() { addApp1Monitor(); WIPS.app2.method = "rr"; addTimer(30, () => { for (const v of ["vs_app1_sea", "vs_app2_sea"]) N[v].appOk = false; log("ltm-sea", "notice", "shell", "(lab) application servers behind vs_app1_sea and vs_app2_sea now return HTTP 503"); render(); }); },
   },
@@ -1187,15 +1218,35 @@ function renderWip() {
   let h = `<h3>Wide IPs<span class="badge">gtm.chala.info</span></h3><span class="small" id="wipvg"></span>`;
   for (const k of WKEYS) {
     const W = WIPS[k];
-    h += `<div class="pool"><div class="pool-head"><b>${W.name}</b><select aria-label="${W.pool} pools load balancing mode" data-set="wmethod:${k}">${Object.entries(METHODS).map(([v, l]) => opt(v, W.method, l)).join("")}</select></div>
-    <span class="small">CNAME from ${fqdn(k)} · Topology picks ${W.pool}_int (internal LDNS) or ${W.pool}_ext. Both pools: ${METHODS[W.method]}${W.method === "rtt" ? ", alternate Round Robin" : ""}, TTL ${POOL_TTL} s, fallback return-to-dns</span>
-    <div class="chk"><span class="small">Monitors</span>${Object.keys(MONS).map(mn => `<label${mn === "bigip" && W.generic ? ' title="The bigip monitor needs a BIG-IP server"' : ""}><input type="checkbox" data-set="wmon:${k}:${mn}" ${W.mons.includes(mn) ? "checked" : ""}${mn === "bigip" && W.generic ? " disabled" : ""}>${mn}</label>`).join("")}</div>
+    h += `<div class="pool"><div class="pool-head"><b>${W.name}</b><span class="badge">${METHODS[W.method]}</span></div>
+    <span class="small">CNAME from ${fqdn(k)} · monitor ${esc(W.mons.length ? W.mons.join(" and ") : "none")}</span>
     <div class="live" id="wl-${k}"></div>
     <div class="acts"><button data-act="dnsq:ldns-a:${k}">Look up from office</button><button data-act="dnsq:ldns-b:${k}">Look up from internet</button></div></div>`;
   }
-  h += `<div class="acts"><label class="small" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="dnsOn" data-set="dnson:x" ${S.dnsOn ? "checked" : ""}>Generate random DNS queries</label></div>`;
+  h += `<div class="acts"><label class="small" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="dnsOn" data-set="dnson:x" ${S.dnsOn ? "checked" : ""}>Generate random DNS queries</label><button data-act="page:config">Configure pools and monitors</button></div>`;
   $("#wip").innerHTML = h;
+  renderWipCfg();
   renderWipLive();
+}
+function renderWipCfg() {
+  let h = `<h3>Wide IPs and pools<span class="badge">gtm.chala.info</span></h3><p class="small" style="margin:0">Each wide IP uses Topology to pick its _int pool (internal LDNS) or _ext pool. In this lab both pools share the settings below.</p>`;
+  for (const k of WKEYS) {
+    const W = WIPS[k];
+    h += `<div class="pool"><div class="pool-head"><b>${W.name}</b><select aria-label="${W.pool} pools load balancing mode" data-set="wmethod:${k}">${Object.entries(METHODS).map(([v, l]) => opt(v, W.method, l)).join("")}</select></div>
+    <span class="small">${W.pool}_int / ${W.pool}_ext${W.method === "rtt" ? " · alternate Round Robin" : ""} · TTL ${POOL_TTL} s · fallback return-to-dns</span>
+    <div class="chk"><span class="small">Monitors</span>${Object.keys(MONS).map(mn => `<label${mn === "bigip" && W.generic ? ' title="The bigip monitor needs a BIG-IP server"' : ""}><input type="checkbox" data-set="wmon:${k}:${mn}" ${W.mons.includes(mn) ? "checked" : ""}${mn === "bigip" && W.generic ? " disabled" : ""}>${mn}</label>`).join("")}</div></div>`;
+  }
+  $("#wipcfg").innerHTML = h;
+}
+function renderProbeCfg() {
+  const row = (name, setP, setF, pref, fb, inherit) => `<b>${name}</b>
+    <select aria-label="${name} prober preference" data-set="${setP}">${inherit ? opt("inherit", pref, `Inherit (${RULES[inherit.pref]})`) : ""}${PREF_OPTS.map(o => opt(o, pref)).join("")}</select>
+    <select aria-label="${name} prober fallback" data-set="${setF}">${inherit ? opt("inherit", fb, `Inherit (${RULES[inherit.fb]})`) : ""}${FB_OPTS.map(o => opt(o, fb)).join("")}</select>`;
+  let h = `<h3>Prober preference</h3><p class="small" style="margin:0">Which big3d runs custom monitors for each server's members: the preference first, then the fallback if the preference has no available prober. Servers can inherit from their data center. The bigip monitor doesn't use a prober.</p>
+  <div class="ptable"><span class="ph">Object</span><span class="ph">Preference</span><span class="ph">Fallback</span>`;
+  for (const [k, d] of Object.entries(DC)) h += row(d.name, `dcpref:${k}`, `dcfb:${k}`, d.pref, d.fb, null);
+  for (const id of PREF_SERVERS) { const n = N[id]; h += row(id, `pref:${id}`, `fb:${id}`, n.pref, n.fb, DC[n.dc]); }
+  $("#probecfg").innerHTML = h + `</div>`;
 }
 function renderWipLive() {
   const vg = S.viewGtm, top = $("#wipvg"); if (!top) return;
@@ -1205,7 +1256,7 @@ function renderWipLive() {
 }
 function renderMons() {
   const used = mn => Object.values(WIPS).filter(W => W.mons.includes(mn)).map(W => W.pool);
-  let h = `<h3>Health monitors</h3><p class="small" style="margin:0">Tick a monitor on a wide IP above to put it on that pool. With several monitors, all must pass.</p>`;
+  let h = `<h3>Health monitors</h3><p class="small" style="margin:0">Tick a monitor under Wide IPs and pools to put it on that pool. With several monitors, all must pass.</p>`;
   for (const m of Object.values(MONS)) {
     const u = used(m.name);
     h += `<div class="pool"><div class="pool-head"><b>/Common/${m.name}</b><span class="badge">${m.builtin ? "built-in" : MTYPES[m.type]}</span></div>
@@ -1401,8 +1452,17 @@ function renderScen() {
   const s = SCEN[S.scen];
   $("#scenText").innerHTML = `<h2>${s.title}</h2><p>${s.text}</p><span class="lbl">What to watch</span><ul>${s.watch.map(w => `<li>${w}</li>`).join("")}</ul>${s.fix ? `<p class="fix">${s.fix}</p>` : ""}`;
 }
-function renderAll() { renderChrome(); renderSvg(); renderInspector(); renderWip(); renderMons(); renderPools(); renderTabs(); renderConsole(); }
-function render() { renderSvg(); renderInspector(); renderPools(); renderWipLive(); }
+function renderAll() { renderChrome(); renderSvg(); renderInspector(); renderWip(); renderMons(); renderPools(); renderProbeCfg(); renderTabs(); renderConsole(); }
+function render() { renderSvg(); renderInspector(); renderPools(); renderProbeCfg(); renderWipLive(); }
+
+/* ---------- page tabs ---------- */
+function setPage(pg) {
+  S.page = pg;
+  for (const b of document.querySelectorAll("#pagetabs [data-page]")) b.setAttribute("aria-selected", String(b.dataset.page === pg));
+  for (const id of ["lab", "config", "learn"]) $("#page-" + id).hidden = id !== pg;
+  try { localStorage.setItem("dnslab.page", pg); } catch (e) { /* storage unavailable */ }
+}
+$("#pagetabs").addEventListener("click", e => { const b = e.target.closest("[data-page]"); if (b) setPage(b.dataset.page); });
 
 /* ---------- events ---------- */
 function select(spec) { const [k, id] = spec.split(":"); S.sel = { k, id }; renderSvg(); renderInspector(); }
@@ -1435,6 +1495,7 @@ function act(a) {
   else if (k === "bind") { N.bind.up = !N.bind.up; log("bind", "notice", "named", N.bind.up ? "starting BIND 9.18 (rndc start)" : "shutting down (rndc stop)"); }
   else if (k === "tab") { S.tab = x; renderTabs(); renderConsole(); $(".console").scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
   else if (k === "pick") { S.sel = { k: "node", id: x }; }
+  else if (k === "page") { setPage(x); return; }
   else if (k === "cert") { const c = CONN[x]; c.cert = !c.cert; if (!c.cert) { c.retry = S.now; log(c.g, "notice", "shell", `bigip_add ${N[c.b].ip}: device certificate added to /config/gtm/server.crt`); } else log(c.b, "notice", "shell", "(lab) device certificate replaced without re-running bigip_add"); }
   else if (k === "iqd") { S.iqd = x; S.tab = "iqdump"; renderTabs(); renderConsole(); $(".console").scrollIntoView({ behavior: "smooth", block: "nearest" }); }
   else if (k === "wan") { S.wan = !S.wan; log("gtm-nyc", "notice", "gtmd", `(lab) WAN link dc_nyc ↔ dc_sea ${S.wan ? "restored" : "down"}`); }
@@ -1496,13 +1557,15 @@ function setv(spec, val, checked) {
   render(); renderWip(); renderConsole();
 }
 const DRAFT_FIELDS = { "nm-name": "name", "nm-send": "send", "nm-recv": "recv", "nm-interval": "interval", "nm-timeout": "timeout" };
-const side = document.querySelector(".side");
-side.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b) act(b.dataset.act); });
-side.addEventListener("change", e => { const t = e.target; if (t.dataset.set) setv(t.dataset.set, t.value, t.checked); });
-side.addEventListener("input", e => { const f = DRAFT_FIELDS[e.target.id]; if (f) S.draft[f] = e.target.value; });
+for (const box of [document.querySelector(".side"), $("#page-config")]) {
+  box.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b) act(b.dataset.act); });
+  box.addEventListener("change", e => { const t = e.target; if (t.dataset.set) setv(t.dataset.set, t.value, t.checked); });
+  box.addEventListener("input", e => { const f = DRAFT_FIELDS[e.target.id]; if (f) S.draft[f] = e.target.value; });
+}
 
 /* ---------- boot: load the default scenario paused ---------- */
 fresh(); buildSvg(); runScenario(S.scen);
+try { const pg = localStorage.getItem("dnslab.page"); if (pg === "config" || pg === "learn") setPage(pg); } catch (e) { /* storage unavailable */ }
 let last = performance.now(), lastUi = 0;
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;

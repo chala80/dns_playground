@@ -34,7 +34,7 @@ An interactive simulation of GSLB on F5 BIG-IP DNS (GTM), in a single HTML file 
 - iQuery certificate mismatch
 - Round Trip Times for app3.chala.info
 
-Click any device, virtual server, generic host, BIND, an iQuery line, a data center or the WAN link to inspect or change it. From a client's panel you can walk through a lookup of any app name with hints. The console tabs mimic `/var/log/gtm`, DNS answers (with the hops each lookup took), monitor instances, `tmsh show gtm iquery`, `tmsh show gtm path`, `bigip_gtm.conf`, BIND `named.conf` views and zone files, and `iqdump`.
+The page has three tabs: **Lab** (diagram, inspector, wide IP status and console), **Configuration** (pool load balancing and monitors, health monitors, prober pools, prober preference) and **Concepts** (background notes). On the Lab tab, click any device, virtual server, generic host, BIND, an iQuery line, a data center or the WAN link to inspect or change it. From a client's panel you can walk through a lookup of any app name with hints. The console tabs mimic `/var/log/gtm`, DNS answers (with the hops each lookup took), monitor instances, `tmsh show gtm iquery`, `tmsh show gtm path`, `bigip_gtm.conf`, BIND `named.conf` views and zone files, and `iqdump`.
 
 ## Caveats
 
