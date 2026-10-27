@@ -223,7 +223,7 @@ code{font-family:var(--f-mono);font-size:12px}
         <svg id="topo" viewBox="0 0 1000 560" role="img" aria-label="BIG-IP DNS GSLB topology with BIND and two data centers"></svg>
         <div class="hint-pop" id="hintPop" role="dialog" aria-live="polite" hidden></div>
       </div></div>
-      <div class="hint">Click any device, virtual server, the generic host, BIND, a data center, an iQuery line or the WAN link to inspect and change it. Dashed orange lines show which big3d runs each custom monitor instance. Member dots show pool member status as seen by the selected gtmd: green available, red offline, blue unknown.</div>
+      <div class="hint">Click any device, virtual server, generic host, BIND, a data center, an iQuery line or the WAN link to inspect and change it. Dashed orange lines show which big3d runs each custom monitor instance. Member dots show pool member status as seen by the selected gtmd: green available, red offline, blue unknown.</div>
     </section>
 
     <aside class="side">
@@ -290,13 +290,13 @@ const NS = "http://www.w3.org/2000/svg";
 const GTMS = ["gtm-nyc", "gtm-sea"];
 const BIGIPS = ["ltm-nyc", "gtm-nyc", "gtm-sea", "ltm-sea"];
 const LTMS = ["ltm-nyc", "ltm-sea"];
-const GEN = "gen-nyc-01";
-const PREF_SERVERS = [...LTMS, GEN];
+const GENS = ["gen-nyc-01", "gen-sea-01"];
+const PREF_SERVERS = [...LTMS, ...GENS];
 const LDNS = ["ldns-a", "ldns-b"];
 const LTM_APPS = ["app1", "app2", "app3"];
 const WKEYS = [...LTM_APPS, "app4"];
 const VSS = ["nyc", "sea"].flatMap(dc => LTM_APPS.map(w => `vs_${w}_${dc}`));
-const MEMBERS = [...VSS, GEN];
+const MEMBERS = [...VSS, ...GENS];
 const SPEEDS = [1, 2, 5, 10, 20];
 const TYPES = {
   iq: "iQuery keepalive / control",
@@ -333,7 +333,8 @@ function fresh() {
     "ldns-b": { id: "ldns-b", kind: "ldns", ip: "203.0.113.53", x: 700, y: 80, rtt: { nyc: 69, sea: 17 }, client: "client-b" },
     "client-a": { id: "client-a", kind: "client", ip: "198.51.100.77", x: 95, y: 80 },
     "client-b": { id: "client-b", kind: "client", ip: "203.0.113.140", x: 905, y: 80 },
-    [GEN]: { id: GEN, kind: "generic", server: GEN, vsName: "app4_web", dc: "nyc", wip: "app4", ip: "10.1.30.11", port: 80, x: 360, y: 430, up: true, vsUp: true, appOk: true, pref: "pool:pp_east", fb: "inherit" },
+    "gen-nyc-01": { id: "gen-nyc-01", kind: "generic", server: "gen-nyc-01", vsName: "app4_web", dc: "nyc", wip: "app4", ip: "10.1.30.11", port: 80, x: 360, y: 430, up: true, vsUp: true, appOk: true, pref: "pool:pp_east", fb: "inherit" },
+    "gen-sea-01": { id: "gen-sea-01", kind: "generic", server: "gen-sea-01", vsName: "app4_web", dc: "sea", wip: "app4", ip: "10.2.30.11", port: 80, x: 640, y: 430, up: true, vsUp: true, appOk: true, pref: "pool:pp_west", fb: "inherit" },
   };
   LTM_APPS.forEach((w, i) => {
     for (const dc of ["nyc", "sea"]) {
@@ -353,7 +354,7 @@ function fresh() {
   WIPS = {};
   for (const [w, method] of [["app1", "rr"], ["app2", "ga"], ["app3", "rtt"], ["app4", "ga"]]) {
     const generic = w === "app4";
-    WIPS[w] = { name: `${w}.gtm.chala.info`, pool: `pool_${w}`, method, generic, mons: generic ? ["http_app4"] : ["bigip"], members: generic ? [GEN] : [`vs_${w}_nyc`, `vs_${w}_sea`], rr: { "gtm-nyc": 0, "gtm-sea": 1 } };
+    WIPS[w] = { name: `${w}.gtm.chala.info`, pool: `pool_${w}`, method, generic, mons: generic ? ["http_app4"] : ["bigip"], members: generic ? GENS : [`vs_${w}_nyc`, `vs_${w}_sea`], rr: { "gtm-nyc": 0, "gtm-sea": 1 } };
   }
   INST = [];
   CONN = {};
@@ -813,7 +814,7 @@ const SCEN = {
   },
   baseline: {
     title: "GSLB with the bigip monitor",
-    text: "Four names in chala.info are CNAMEs into gtm.chala.info, which BIND delegates to BIG-IP DNS. app1 to app3 each have a pool of two LTM virtual servers, one per data center, monitored by bigip: the LTM's own big3d reports its virtual server status to every gtmd over iQuery, so no probes are sent. app4 is a generic host with its own scenario.",
+    text: "Four names in chala.info are CNAMEs into gtm.chala.info, which BIND delegates to BIG-IP DNS. app1 to app3 each have a pool of two LTM virtual servers, one per data center, monitored by bigip: the LTM's own big3d reports its virtual server status to every gtmd over iQuery, so no probes are sent. app4 is served by two generic hosts and has its own scenario.",
     watch: ["Each gtmd builds 8 iQuery connections, to big3d on all four BIG-IPs, itself included. None goes to the generic host.", "Every 30 s each LTM's big3d sends one virtual server status list (teal) to both gtmds. The members turn from blue to green.", "app1 uses Round Robin, app2 Global Availability (New York first), app3 Round Trip Times.", "The LDNS caches BIND's CNAME for 3600 s and gtmd's A record for 30 s. The DNS answers tab shows which hops each lookup took."],
     setup() {},
   },
@@ -841,11 +842,11 @@ const SCEN = {
     setup() { addTimer(30, () => { N.vs_app2_nyc.vsUp = false; log("ltm-nyc", "err", "tmm", "No members available for pool /Common/app2_pool", "01010028:3"); render(); }); },
   },
   generic: {
-    title: "Generic host monitored through a prober pool",
-    text: "app4.chala.info points to pool_app4, whose only member is gen-nyc-01, a plain web server (server type Generic Host). It runs no big3d, so it has no iQuery connection and the bigip monitor can't be used. Its custom monitor http_app4 is run by a big3d picked from prober pool pp_east, set here to Global Availability: gtm-nyc first, then ltm-nyc. At 14:02:40 big3d stops on gtm-nyc.",
-    watch: ["No iQuery line goes to gen-nyc-01. gtmd never talks to it directly.", "An orange GET / probe goes from the chosen pp_east member to the host. The result travels to both gtmds over that BIG-IP's iQuery connections.", "When gtm-nyc's big3d stops, both gtmds lose iQuery to it, so the next probe moves to ltm-nyc, pp_east member #2. The member stays green.", "Click gen-nyc-01 and stop the web service: probes get RST, and after 120 s gtmd marks it red and app4 has no answer (fallback)."],
-    fix: "Change gen-nyc-01's prober preference to Inside Data Center or a different pool and watch the prober move.",
-    sel: GEN,
+    title: "Generic hosts monitored through prober pools",
+    text: "app4.chala.info points to pool_app4 (Global Availability), whose members are two plain web servers of server type Generic Host: gen-nyc-01 first, then gen-sea-01. They run no big3d, so they have no iQuery connection and the bigip monitor can't be used. Their custom monitor http_app4 is run by a big3d from each data center's prober pool: pp_east (set here to Global Availability: gtm-nyc, then ltm-nyc) for gen-nyc-01, and pp_west (ltm-sea, then gtm-sea) for gen-sea-01. At 14:02:40 big3d stops on gtm-nyc.",
+    watch: ["No iQuery line goes to either generic host. gtmd never talks to them directly.", "Orange GET / probes go from gtm-nyc to gen-nyc-01 and from ltm-sea to gen-sea-01. Each result travels to both gtmds over that BIG-IP's iQuery connections.", "When gtm-nyc's big3d stops, both gtmds lose iQuery to it, so the next probe of gen-nyc-01 moves to ltm-nyc, pp_east member #2. The member stays green.", "Click gen-nyc-01 and stop the web service: probes get RST, and after 120 s gtmd marks it red and app4.chala.info fails over to gen-sea-01 (10.2.30.11)."],
+    fix: "Change a generic host's prober preference to Inside Data Center or the other pool and watch the prober move.",
+    sel: "gen-nyc-01",
     setup() { POOLS.pp_east.method = "ga"; addTimer(40, () => { N["gtm-nyc"].big3d = false; log("gtm-nyc", "notice", "bigstart", "big3d stopped (bigstart stop big3d)"); render(); }); },
   },
   wan: {
@@ -1234,8 +1235,10 @@ function confText() {
     if (vss.length) L.push(`    virtual-servers {`, ...vss.map(v => `        ${v} { destination ${N[v].ip}:${N[v].port} }`), `    }`);
     L.push(`}`);
   }
-  const gn = N[GEN];
-  L.push(`gtm server /Common/${GEN} {`, `    addresses { ${gn.ip} { device-name ${GEN} } }`, `    datacenter /Common/${DC[gn.dc].name}`, `    product generic-host`, ...proberLines(gn), `    virtual-servers {`, `        ${gn.vsName} { destination ${gn.ip}:${gn.port} }`, `    }`, `}`);
+  for (const id of GENS) {
+    const gn = N[id];
+    L.push(`gtm server /Common/${id} {`, `    addresses { ${gn.ip} { device-name ${id} } }`, `    datacenter /Common/${DC[gn.dc].name}`, `    product generic-host`, ...proberLines(gn), `    virtual-servers {`, `        ${gn.vsName} { destination ${gn.ip}:${gn.port} }`, `    }`, `}`);
+  }
   for (const m of Object.values(MONS)) {
     if (m.builtin) continue;
     L.push(`gtm monitor ${m.type} /Common/${m.name} {`, `    defaults-from /Common/${m.type}`, `    destination *:*`, `    interval ${m.interval}`);
@@ -1295,7 +1298,7 @@ function renderConsole() {
     const g = S.viewGtm;
     h = `<table class="t"><thead><tr><th>Gtm::IQuery</th><th>Server</th><th>Data Center</th><th>iQuery State</th><th>Query Reconnects</th><th>Bits In</th><th>Bits Out</th><th>Backlogs</th><th>Cert Expiration Date</th></tr></thead><tbody>`;
     for (const bb of BIGIPS) { const c = conn(g, bb); h += `<tr><td>${N[bb].ip}</td><td>/Common/${bb}</td><td>/Common/${DC[N[bb].dc].name}</td><td><span class="pill"><span class="dot ${c.st === "connected" ? "g" : c.st === "ssl" ? "r" : c.st === "connecting" ? "y" : "k"}"></span>${N[g].up ? (c.st === "connected" ? "connected" : c.st === "ssl" ? "not connected (SSL error)" : c.st === "connecting" ? "connecting" : "not connected") : "—"}</span></td><td>${c.rec}</td><td>${fmtBits(c.bin)}</td><td>${fmtBits(c.bout)}</td><td>0</td><td>${c.cert ? "untrusted" : "10/12/36 09:14:02"}</td></tr>`; }
-    h += `</tbody></table><div class="small" style="margin-top:6px">${GEN} is not listed: a generic host runs no big3d, so there is no iQuery connection to it.</div>`;
+    h += `</tbody></table><div class="small" style="margin-top:6px">${GENS.join(" and ")} are not listed: a generic host runs no big3d, so there is no iQuery connection to it.</div>`;
   } else if (S.tab === "mon") {
     h = `<table class="t"><thead><tr><th>Monitor instance</th><th>Pool member</th><th>Run by (big3d)</th><th>Why this prober</th><th>Last probe</th>${GTMS.map(g => `<th>gtmd@${g}</th>`).join("")}</tr></thead><tbody>`;
     for (const i of INST) {
@@ -1368,10 +1371,10 @@ function act(a) {
   } else if (k === "big3d") { const n = N[x]; n.big3d = !n.big3d; log(x, "notice", "bigstart", n.big3d ? "big3d started (bigstart start big3d)" : "big3d stopped (bigstart stop big3d)"); }
   else if (k === "vsfail") {
     const n = N[x]; n.vsUp = !n.vsUp;
-    if (n.kind === "generic") log("gtm-nyc", "notice", "shell", `(lab) web service on ${x} ${n.vsUp ? "started" : "stopped"}`);
+    if (n.kind === "generic") log("gtm-" + n.dc, "notice", "shell", `(lab) web service on ${x} ${n.vsUp ? "started" : "stopped"}`);
     else log(n.server, n.vsUp ? "notice" : "err", "tmm", n.vsUp ? `Pool /Common/${n.wip}_pool member 10.${n.dc === "nyc" ? 1 : 2}.40.21:8443 monitor status up` : `No members available for pool /Common/${n.wip}_pool`, n.vsUp ? "01070727:5" : "01010028:3");
   }
-  else if (k === "app") { const n = N[x]; n.appOk = !n.appOk; log(n.kind === "generic" ? "gtm-nyc" : n.server, "notice", "shell", `(lab) application behind ${x} ${n.appOk ? "restored, returns HTTP 200" : "now returns HTTP 503 Service Unavailable"}`); }
+  else if (k === "app") { const n = N[x]; n.appOk = !n.appOk; log(n.kind === "generic" ? "gtm-" + n.dc : n.server, "notice", "shell", `(lab) application behind ${x} ${n.appOk ? "restored, returns HTTP 200" : "now returns HTTP 503 Service Unavailable"}`); }
   else if (k === "bind") { N.bind.up = !N.bind.up; log("bind", "notice", "named", N.bind.up ? "starting BIND 9.18 (rndc start)" : "shutting down (rndc stop)"); }
   else if (k === "tab") { S.tab = x; renderTabs(); renderConsole(); $(".console").scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
   else if (k === "pick") { S.sel = { k: "node", id: x }; }

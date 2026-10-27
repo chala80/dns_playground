@@ -13,7 +13,7 @@ An interactive simulation of GSLB on F5 BIG-IP DNS (GTM), in a single HTML file 
   - `app3.gtm.chala.info` uses Round Trip Times.
 
   Each points to a GTM pool with one LTM virtual server per data center.
-- **Generic host:** `app4.gtm.chala.info` points to `gen-nyc-01`, a Generic Host server. It runs no big3d, so it has no iQuery connection and can't use the bigip monitor. It's monitored by a custom monitor run through prober pool `pp_east`.
+- **Generic hosts:** `app4.gtm.chala.info` (Global Availability) points to `gen-nyc-01` and `gen-sea-01`, servers of type Generic Host. They run no big3d, so they have no iQuery connection and can't use the bigip monitor. Each is monitored by a custom monitor run through its data center's prober pool (`pp_east`, `pp_west`).
 - **bigip monitor:** sends no probe. The LTM's big3d reports the status of its own virtual servers to every gtmd over iQuery.
 - **Custom monitors:** create http, https, tcp or gateway_icmp monitors with your own send and receive strings, then tick them on any pool. A prober big3d probes the member and reports the result to every gtmd. It's picked by prober preference and fallback: server, data center or prober pool. With several monitors on a pool, all must pass.
 - **iQuery mesh:** gtmd on each of the two DNS devices keeps a TLS connection (TCP 4353) to big3d on every BIG-IP, itself included: 8 connections.
@@ -25,12 +25,12 @@ An interactive simulation of GSLB on F5 BIG-IP DNS (GTM), in a single HTML file 
 - Add a custom HTTP monitor
 - Application failure the bigip monitor misses (HTTP 503 behind a green LTM virtual server)
 - Data center failover with Global Availability
-- Generic host monitored through a prober pool
+- Generic hosts monitored through prober pools
 - WAN link cut
 - iQuery certificate mismatch
 - Round Trip Times for app3.chala.info
 
-Click any device, virtual server, the generic host, BIND, an iQuery line, a data center or the WAN link to inspect or change it. From a client's panel you can walk through a lookup of any app name with hints. The console tabs mimic `/var/log/gtm`, DNS answers (with the hops each lookup took), monitor instances, `tmsh show gtm iquery`, `tmsh show gtm path`, `bigip_gtm.conf`, the BIND zone file and `iqdump`.
+Click any device, virtual server, generic host, BIND, an iQuery line, a data center or the WAN link to inspect or change it. From a client's panel you can walk through a lookup of any app name with hints. The console tabs mimic `/var/log/gtm`, DNS answers (with the hops each lookup took), monitor instances, `tmsh show gtm iquery`, `tmsh show gtm path`, `bigip_gtm.conf`, the BIND zone file and `iqdump`.
 
 ## Caveats
 
