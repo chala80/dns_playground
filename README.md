@@ -21,6 +21,7 @@ An interactive simulation of GSLB on F5 BIG-IP DNS (GTM), in a single HTML file 
 - **bigip monitor:** sends no probe. The LTM's big3d reports the status of its own virtual servers to every gtmd over iQuery.
 - **Custom monitors:** create http, https, tcp or gateway_icmp monitors with your own send and receive strings, then tick them on any pool. A prober big3d probes the member and reports the result to every gtmd. It's picked by prober preference and fallback: server, data center or prober pool. With several monitors on a pool, all must pass.
 - **iQuery mesh:** gtmd on each of the two DNS devices keeps a TLS connection (TCP 4353) to big3d on every BIG-IP, itself included: 8 connections.
+- **DNS Express (optional):** BIND becomes a hidden primary. zxfrd on each BIG-IP DNS takes NOTIFY, checks the SOA serial and pulls `chala.info` with AXFR or IXFR (TSIG key `dnsx-ext` selects BIND's external view). The listeners then answer internet resolvers from that copy, while the office resolver keeps asking BIND's internal view. Each listener follows the DNS profile order: wide IPs, DNS Express, an optional transparent DNS cache, then the unhandled query action (allow sends to `dns_bind_pool`, i.e. BIND). It also models `dnsexpress.hugepages` memory, `persisthugepages`, Allow NOTIFY From, and resolver negative caching (SOA minimum 300 s). Turn it on in any scenario from the Configuration tab.
 
 ## Scenarios
 
@@ -34,11 +35,22 @@ An interactive simulation of GSLB on F5 BIG-IP DNS (GTM), in a single HTML file 
 - iQuery certificate mismatch
 - Round Trip Times for app3.chala.info
 
-The page has three tabs: **Lab** (diagram, inspector, wide IP status and console), **Configuration** (pool load balancing and monitors, health monitors, prober pools, prober preference) and **Concepts** (background notes). On the Lab tab, click any device, virtual server, generic host, BIND, an iQuery line, a data center or the WAN link to inspect or change it. From a client's panel you can walk through a lookup of any app name with hints. The console tabs mimic `/var/log/gtm`, DNS answers (with the hops each lookup took), monitor instances, `tmsh show gtm iquery`, `tmsh show gtm path`, `bigip_gtm.conf`, BIND `named.conf` views and zone files, and `iqdump`.
+DNS Express scenarios. Each one has a DNS cache on/off option and an unhandled-query-action picker:
+
+- Hidden primary BIND: initial AXFR, guided lookups, then a NOTIFY and IXFR for a new record
+- Zone transfer runs out of memory: a 1.8 M-record import overflows `dnsexpress.hugepages` on gtm-sea, and zxfrd ends up in an out-of-memory restart loop with no zone data, so queries fall through to the cache and the BIND pool
+- Incomplete IXFR applied halfway: only the first message of a two-message IXFR is applied (F5 bug 667542), the serial matches, and the result is intermittent authoritative NXDOMAIN
+- Zone transfer cut off mid-stream: a path MTU blackhole lets NOTIFY and SOA through, but the transfer times out and the stale copy is retried every 600 s
+- Split DNS leak from the wrong view: without TSIG, BIND hands the BIG-IP's 10.x self IP the internal view, which leaks internal records and private referrals
+- NOTIFY dropped: BIND's notify-source isn't allowed, so changes wait for the SOA refresh
+- Serial number went backwards: a restored backup has a lower serial, so no transfer happens
+
+The page has three tabs: **Lab** (diagram, inspector, wide IP status and console), **Configuration** (pool load balancing and monitors, health monitors, prober pools, prober preference) and **Concepts** (background notes). On the Lab tab, click any device, virtual server, generic host, BIND, an iQuery line, a data center or the WAN link to inspect or change it. From a client's panel you can walk through a lookup of any app name with hints. The console tabs mimic `/var/log/gtm` (including zxfrd), DNS answers (with the hops each lookup took), monitor instances, `tmsh show gtm iquery`, `tmsh show gtm path`, `bigip_gtm.conf`, BIND `named.conf` views and zone files, `tmsh show ltm dns zone` with a `dnsxdump` of each device's copy, and `iqdump`.
 
 ## Caveats
 
 - In a real config the internal and external virtual server objects are monitored separately. The lab shares one status per real server to keep the diagram readable.
 - 1× is real time with BIG-IP default timers: iQuery heartbeat 10 s, bigip monitor 30 s / 90 s, custom monitors 30 s / 120 s, path TTL 2400 s, pool TTL 30 s. Use 5× to 20× to skip ahead. Packets in flight are slowed down so they are visible.
 - The LDNS is assumed to already know where `chala.info` lives, so root and `.info` lookups are skipped.
+- DNS Express: zxfrd log text, `dnsxdump` output and the memory estimate (about 320 bytes per record) are illustrative. A zone with no data is modeled as falling through to the cache and the unhandled query action, and SOA expire isn't modeled. Queries the listener sends to the BIND pool keep the resolver's source address (no SNAT), so BIND picks the view from the original resolver.
 - Log lines, iQuery XML and config are modeled on real output but simplified. Some edge behavior is approximated. Verify against a real device.

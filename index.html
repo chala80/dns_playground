@@ -14,7 +14,7 @@
   --bg:#e8ecf0; --panel:#fbfcfd; --sunk:#f0f3f6; --zone:#dfe6ec; --inet:#e9e4f3; --corp:#e2eee6; --dmz:#f1ebdf;
   --ink:#15212c; --muted:#56656f; --line:#cbd4dc; --wire:#9eacb8;
   --accent:#2450c9; --accent-ink:#ffffff;
-  --iq:#2450c9; --probe:#c27400; --result:#08857a; --path:#7b47d1; --dns:#c22d6a;
+  --iq:#2450c9; --probe:#c27400; --result:#08857a; --path:#7b47d1; --dns:#c22d6a; --xfr:#5f8a00;
   --g:#1d9a50; --r:#d33a3a; --b:#2f7fd8; --y:#c99500; --k:#6b737b;
   --f-disp:"Archivo","Arial Narrow",system-ui,sans-serif;
   --f-body:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -24,7 +24,7 @@
   --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b; --corp:#16241c; --dmz:#25211a;
   --ink:#e2e9ef; --muted:#93a3b1; --line:#2a3743; --wire:#4c5c6a;
   --accent:#6f95ff; --accent-ink:#0b1220;
-  --iq:#6f95ff; --probe:#f0a52a; --result:#2fc4b0; --path:#ad86ff; --dns:#ff6aa4;
+  --iq:#6f95ff; --probe:#f0a52a; --result:#2fc4b0; --path:#ad86ff; --dns:#ff6aa4; --xfr:#a8d64a;
   --g:#3ccf76; --r:#ff6161; --b:#5aa4ff; --y:#f1c232; --k:#7d8790;
   color-scheme:dark;
 }}
@@ -32,7 +32,7 @@
   --bg:#0e141a; --panel:#151d25; --sunk:#111820; --zone:#1a2530; --inet:#1f1b2b; --corp:#16241c; --dmz:#25211a;
   --ink:#e2e9ef; --muted:#93a3b1; --line:#2a3743; --wire:#4c5c6a;
   --accent:#6f95ff; --accent-ink:#0b1220;
-  --iq:#6f95ff; --probe:#f0a52a; --result:#2fc4b0; --path:#ad86ff; --dns:#ff6aa4;
+  --iq:#6f95ff; --probe:#f0a52a; --result:#2fc4b0; --path:#ad86ff; --dns:#ff6aa4; --xfr:#a8d64a;
   --g:#3ccf76; --r:#ff6161; --b:#5aa4ff; --y:#f1c232; --k:#7d8790;
   color-scheme:dark;
 }
@@ -138,6 +138,7 @@ svg#topo{display:block;width:100%;height:auto}
 .pk.iq circle{fill:var(--iq)} .pk.probe circle{fill:var(--probe)} .pk.result circle{fill:var(--result)} .pk.path circle{fill:var(--path)} .pk.dns circle{fill:var(--dns)}
 .pk text{font-family:var(--f-mono);font-size:10px;font-weight:600;paint-order:stroke;stroke:var(--panel);stroke-width:3px}
 .pk.dns text{fill:var(--dns)} .pk.probe text{fill:var(--probe)} .pk.path text{fill:var(--path)}
+.pk.xfr circle{fill:var(--xfr)} .pk.xfr text{fill:var(--xfr)}
 .flash{fill:none;stroke-width:2}
 
 /* side rail */
@@ -169,6 +170,10 @@ svg#topo{display:block;width:100%;height:auto}
 .chk{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
 .chk label{display:inline-flex;gap:5px;align-items:center;font-family:var(--f-mono);font-size:12px;cursor:pointer}
 .small.err{color:var(--r)}
+.cb{display:flex;gap:6px;align-items:flex-start;font-size:13px;cursor:pointer}
+.cb input{margin-top:3px}
+.scen .opts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:8px;font-size:13px}
+.scen .opts label{display:inline-flex;align-items:center;gap:6px}
 
 /* console */
 .console .tabs{display:flex;flex-wrap:wrap;gap:2px;padding:8px 10px 0;border-bottom:1px solid var(--line)}
@@ -202,7 +207,7 @@ code{font-family:var(--f-mono);font-size:12px}
   <header class="top">
     <div class="brand">
       <h1>BIG-IP DNS Traffic Lab</h1>
-      <p>Split-horizon GSLB with F5 BIG-IP DNS for chala.info: BIND is authoritative for the zone and delegates gtm.chala.info to two BIG-IP DNS devices in two data centers. Office clients get internal addresses and internet clients get public ones. Follow a lookup hop by hop, and watch how the bigip monitor, custom monitors and generic hosts feed gtmd the status it answers from.</p>
+      <p>Split-horizon GSLB with F5 BIG-IP DNS for chala.info: BIND is authoritative for the zone and delegates gtm.chala.info to two BIG-IP DNS devices in two data centers. Office clients get internal addresses and internet clients get public ones. Follow a lookup hop by hop, and watch how the bigip monitor, custom monitors and generic hosts feed gtmd the status it answers from. The DNS Express scenarios turn BIND into a hidden primary and serve chala.info from memory on the BIG-IPs, then break the zone transfers.</p>
     </div>
     <div class="transport">
       <span class="clock" id="clock">Oct 27 14:02:00</span>
@@ -267,6 +272,7 @@ code{font-family:var(--f-mono);font-size:12px}
         <section class="card sec" id="pools"></section>
         <section class="card sec" id="probecfg"></section>
       </div>
+      <section class="card sec" id="dxcfg"></section>
     </div>
   </div>
 
@@ -313,6 +319,26 @@ code{font-family:var(--f-mono);font-size:12px}
       </ul>
     </div>
     <div class="card">
+      <h4>DNS Express</h4>
+      <ul>
+        <li>zxfrd on each BIG-IP DNS acts as a secondary for <code>chala.info</code>. It accepts NOTIFY from the primary, checks the SOA serial, and pulls the zone with AXFR (whole zone) or IXFR (changes only). TMM then answers from that copy without BIND.</li>
+        <li>BIND becomes a hidden primary: the public NS records point at the BIG-IP listeners and no resolver queries BIND directly.</li>
+        <li>A listener's DNS profile tries, in order: DNS iRules, DNSSEC, wide IPs, DNS Express, the DNS cache, then the unhandled query action (allow sends the query to the listener's pool or local BIND). See F5 K14510.</li>
+        <li>DNS Express answers before the cache. A cache can't cover for a stale or incomplete DNS Express copy, because DNS Express answers NXDOMAIN itself. The cache only helps when the zone has no data loaded or DNS Express is disabled.</li>
+        <li>Zone data is kept in a database under <code>/shared/zxfrd</code>, or with <code>dnsexpress.hugepages</code> in reserved memory (value × 2 MB) taken from TMM. <code>dnsexpress.persisthugepages</code> keeps it across restarts.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Troubleshooting DNS Express</h4>
+      <ul>
+        <li>Compare serials: <code>dig @192.0.2.53 chala.info SOA</code> against <code>tmsh show ltm dns zone</code>. A matching serial doesn't prove matching data (see the IXFR scenario).</li>
+        <li>Look at the copy itself with <code>dnsxdump</code>, and at <code>grep zxfrd /var/log/ltm</code> for transfer errors.</li>
+        <li>BIND picks a view by source address or TSIG key. Without a key, the BIG-IP's 10.x self IP matches the internal view and DNS Express publishes internal records to the internet.</li>
+        <li>NOTIFY is accepted only from the DNS Express server address or the zone's Allow NOTIFY From list. A multi-homed primary often sends it from another address.</li>
+        <li>Not simulated here: unknown record types such as TYPE65281 (Microsoft WINS) failing every transfer on old versions (F5 bug 427972), a full <code>/var</code> crashing zxfrd (614788), a TSIG secret mismatch (BADKEY / BADSIG), and an HA standby that didn't process transfers serving stale data after failover.</li>
+      </ul>
+    </div>
+    <div class="card">
       <h4>About this model</h4>
       <p>1× is real time and uses BIG-IP defaults: iQuery heartbeat 10 s, bigip monitor 30 s / 90 s, custom monitors 30 s / 120 s, path TTL 2400 s, pool TTL 30 s. Use 5× to 20× to skip ahead. Packets in flight are slowed down so you can see them; real iQuery and DNS messages take milliseconds. The LDNS is assumed to already know where chala.info lives, so root and .info lookups are skipped. Internal and external virtual server objects share one status per real server here; on a real system each is monitored separately. Log lines, iQuery XML and the config tabs are modeled on real output but simplified, so check a real device for exact text. Real CLI to try: <code>tmsh show gtm iquery</code>, <code>tmsh show gtm pool a</code>, <code>dig app1.chala.info +trace</code>, <code>iqdump 10.1.10.10</code>.</p>
     </div>
@@ -344,8 +370,9 @@ const TYPES = {
   probe: "Custom monitor probe",
   path: "Path probe to LDNS",
   dns: "DNS query / answer",
+  xfr: "Zone transfer (NOTIFY, SOA, AXFR / IXFR)",
 };
-const PID = { "gtm-nyc": { gtmd: 8123, big3d: 5120, mcpd: 6011 }, "gtm-sea": { gtmd: 8240, big3d: 5177, mcpd: 6034 }, "ltm-nyc": { big3d: 4471, tmm: 9001 }, "ltm-sea": { big3d: 4502, tmm: 9010 }, bind: { named: 1187 } };
+const PID = { "gtm-nyc": { gtmd: 8123, big3d: 5120, mcpd: 6011, zxfrd: 7431, tmm: 9050 }, "gtm-sea": { gtmd: 8240, big3d: 5177, mcpd: 6034, zxfrd: 7466, tmm: 9060 }, "ltm-nyc": { big3d: 4471, tmm: 9001 }, "ltm-sea": { big3d: 4502, tmm: 9010 }, bind: { named: 1187 } };
 const RULES = { inherit: "Inherit from data center", inside: "Inside Data Center", outside: "Outside Data Center", any: "Any Available", none: "None", "pool:pp_east": "Prober pool pp_east", "pool:pp_west": "Prober pool pp_west" };
 const PREF_OPTS = ["inside", "outside", "pool:pp_east", "pool:pp_west"];
 const FB_OPTS = ["any", "inside", "outside", "none", "pool:pp_east", "pool:pp_west"];
@@ -366,8 +393,8 @@ const addrFor = (m, ldns) => isInt(ldns) ? m.ip : m.pub;
 const lsnr = (g, ldns) => isInt(ldns) ? N[g].listener : N[g].pub;
 const ldnsName = id => `LDNS ${id.slice(-1).toUpperCase()} (${N[id].internal ? "internal" : "ISP"})`;
 
-let S = { speed: 1, playing: false, started: false, viewGtm: "gtm-nyc", sel: { k: "node", id: "client-a" }, tab: "log", show: { iq: true, result: true, probe: true, path: true, dns: true }, iqd: "gtm-sea>ltm-nyc", dnsOn: true, scen: "dns", draft: draftFor("http"), err: "", page: "lab" };
-let N, DC, POOLS, WIPS, MONS, INST, CONN, VIEW, PATHS, PENDING, CACHE, TIMERS, LOGS, DNSLOG, PK, FL, RR, HINT = null;
+let S = { speed: 1, playing: false, started: false, viewGtm: "gtm-nyc", sel: { k: "node", id: "client-a" }, tab: "log", show: { iq: true, result: true, probe: true, path: true, dns: true, xfr: true }, iqd: "gtm-sea>ltm-nyc", dnsOn: true, scen: "dns", draft: draftFor("http"), err: "", page: "lab", dxOpt: { cache: false, unh: "allow" } };
+let N, DC, POOLS, WIPS, MONS, INST, CONN, VIEW, PATHS, PENDING, CACHE, TIMERS, LOGS, DNSLOG, PK, FL, RR, DX, ZB, HINT = null;
 
 /* ---------- state ---------- */
 function fresh() {
@@ -413,7 +440,15 @@ function fresh() {
   }
   VIEW = {}; PATHS = {}; CACHE = {};
   for (const g of GTMS) { VIEW[g] = {}; PATHS[g] = { "ldns-a": {}, "ldns-b": {} }; }
-  for (const l of LDNS) CACHE[l] = { ns: 0, cname: {}, a: {} };
+  for (const l of LDNS) CACHE[l] = freshCache();
+  /* BIND's zone (both views share serial and these knobs) and the DNS Express state on each BIG-IP DNS */
+  ZB = { serial: 2026102701, www: "203.0.113.80", shop: false, bulk: 0, nsrc: N.bind.ip };
+  DX = { on: false, zoneEn: true, tsig: true, allow54: false, cache: S.dxOpt.cache, unh: S.dxOpt.unh, persist: true, hp: {}, mtu: { nyc: false, sea: false }, ixfrBug: {}, z: {}, cs: {}, st: {} };
+  GTMS.forEach((g, k) => {
+    DX.hp[g] = 0; DX.cs[g] = {};
+    DX.st[g] = { dx: 0, cache: 0, pool: 0, unh: 0 };
+    DX.z[g] = { recs: null, serial: 0, view: "", bulk: 0, count: 0, busy: false, again: false, gen: 0, next: 3 + k * 1.5, xfr: "", prog: 0, lastXfr: null, last: "never", err: "", fails: 0, oom: 0, notOk: 0, notIgn: 0 };
+  });
   PENDING = {}; TIMERS = []; LOGS = []; DNSLOG = []; PK = []; FL = []; RR = {};
   S.now = 0; S.nextSec = 0; S.nextDns = 5; S.wan = true; S.dnsOn = true; S.guiding = false;
   HINT = null;
@@ -424,6 +459,7 @@ function fresh() {
 
 /* ---------- helpers ---------- */
 const conn = (g, b) => CONN[g + ">" + b];
+const freshCache = () => ({ ns: 0, cname: {}, a: {}, nsInt: false });
 const reach = (a, b) => { const A = N[a], B = N[b]; if (!A.dc || !B.dc) return true; return A.dc === B.dc || S.wan; };
 const isWeb = m => m.type === "http" || m.type === "https";
 const effMons = W => W.mons.length ? W.mons : W.generic ? [] : ["bigip"];
@@ -724,8 +760,9 @@ function decide(g, ldns, wk) {
 }
 const pickListener = () => GTMS[Math.random() < 0.5 ? 0 : 1];
 function dnsQuery(ldns, wk, guide, after) {
-  ldns = ldns || LDNS[Math.random() < 0.5 ? 0 : 1];
-  wk = wk || WKEYS[Math.floor(Math.random() * WKEYS.length)];
+  /* with DNS Express on, bias random traffic toward the internet resolver and mix in plain zone records */
+  ldns = ldns || (DX.on ? (Math.random() < 0.7 ? "ldns-b" : "ldns-a") : LDNS[Math.random() < 0.5 ? 0 : 1]);
+  wk = wk || (DX.on && Math.random() < 0.4 ? pickStatic() : WKEYS[Math.floor(Math.random() * WKEYS.length)]);
   if (guide && S.guiding) guide = false;
   if (guide) S.guiding = true;
   const L = N[ldns], q = { ldns, wk, guide, after: guide ? after : null, n: 0, path: [] };
@@ -733,20 +770,37 @@ function dnsQuery(ldns, wk, guide, after) {
     spawn(L.client, ldns, "dns", { label: `${fqdn(wk)} A?`, onArrive: () => ldnsResolve(q) }));
 }
 function ldnsResolve(q) {
-  const C = CACHE[q.ldns], wk = q.wk, a = C.a[wk];
+  const C = CACHE[q.ldns], wk = q.wk, a = C.a[wk], st = isStatic(wk), name = fqdn(wk);
   if (a && a.exp > S.now) {
     const left = Math.ceil(a.exp - S.now);
     q.path.push("LDNS cache");
+    if (a.neg) { guideStep(q, q.ldns, `LDNS has a cached NXDOMAIN for ${name}, with ${left} s left, and answers it at once without asking anyone.`, () => fail(q, "NXDOMAIN", `negative answer cached from ${a.g}, ${left} s left`, a.g, "LDNS cache")); return; }
+    if (st) { guideStep(q, q.ldns, `LDNS already has ${name} A ${a.ip} cached, with ${left} s of TTL left, and answers at once.`, () => replyStatic(q, a.ip, { g: "—", method: "LDNS cache", why: `cached answer from ${a.g}, ${left} s TTL left` })); return; }
     guideStep(q, q.ldns, `LDNS already has the answer cached: ${fqdn(wk)} CNAME ${WIPS[wk].name}, A ${a.ip}, with ${left} s of TTL left. It answers at once, without asking BIND or BIG-IP DNS.`, () => reply(q, a.ip, a.member, { g: "—", method: "LDNS cache", why: `cached answer from ${a.g}, ${left} s TTL left` }));
     return;
   }
-  if (C.cname[wk] > S.now && C.ns > S.now) {
+  if (!st && C.cname[wk] > S.now && C.ns > S.now) {
     const g = pickListener();
     q.path.push("cached CNAME");
     guideStep(q, q.ldns, `LDNS still has the CNAME (${fqdn(wk)} → ${WIPS[wk].name}) and the gtm.chala.info delegation cached, but no valid A record. It skips BIND and asks a BIG-IP DNS listener, ${g} (${lsnr(g, q.ldns)}).`, () => askGtm(q, g, 0));
     return;
   }
-  guideStep(q, q.ldns, `LDNS has nothing cached for ${fqdn(wk)}. It sends the query to BIND (ns1.chala.info, ${N.bind.ip}), the authoritative server for chala.info.`, () => askBind(q));
+  if (DX.on && !isInt(q.ldns)) {
+    const g = pickListener();
+    guideStep(q, q.ldns, `LDNS has nothing cached for ${name}. With DNS Express, the public name servers for chala.info are the BIG-IP DNS listeners, so it asks ${g} at ${N[g].pub}. BIND is a hidden primary that no resolver on the internet queries.`, () => askListener(q, g, 0));
+    return;
+  }
+  guideStep(q, q.ldns, `LDNS has nothing cached for ${name}. It sends the query to BIND (ns1.chala.info, ${N.bind.ip}), the authoritative server for chala.info.`, () => st ? askBindStatic(q) : askBind(q));
+}
+function askBindStatic(q) {
+  const view = viewOf(q.ldns), name = fqdn(q.wk);
+  q.path.push(`BIND (${view})`);
+  spawn(q.ldns, "bind", "dns", { label: `${name} A?`, onArrive: () => {
+    if (!N.bind.up) { flash(N.bind.x, N.bind.y, "r"); fail(q, "SERVFAIL", "BIND (named) is not answering"); return; }
+    const r = answerFrom(zoneRecs(view), q.wk);
+    guideStep(q, "bind", `BIND answers from its <b>${view}</b> view: ${r.a ? `${name} A ${r.a}` : `there is no ${name} in this view, so NXDOMAIN`}.`, () =>
+      spawn("bind", q.ldns, "dns", { label: ansLabel(r), onArrive: () => ldnsGot(q, r, "BIND", `BIND (${view} view)`, r.a ? `answered by BIND, ${view} view` : `no ${name} in BIND's ${view} view`) }));
+  } });
 }
 function askBind(q) {
   const wk = q.wk, view = viewOf(q.ldns), int = isInt(q.ldns);
@@ -755,7 +809,7 @@ function askBind(q) {
     if (!N.bind.up) { flash(N.bind.x, N.bind.y, "r"); fail(q, "SERVFAIL", "BIND (named) is not answering, so the LDNS can't learn the CNAME"); return; }
     guideStep(q, "bind", `BIND sees the query come from ${N[q.ldns].ip}, which ${int ? `matches acl internal_nets (${INTERNAL_NET}), so it answers from the <b>internal</b> view` : `is outside ${INTERNAL_NET}, so it answers from the <b>external</b> view`}. There it finds <b>${wk} IN CNAME ${WIPS[wk].name}.</b> gtm.chala.info is delegated, so it adds a referral to the listeners' ${int ? "internal" : "public"} addresses: gtm-nyc ${lsnr("gtm-nyc", q.ldns)} and gtm-sea ${lsnr("gtm-sea", q.ldns)}.`, () =>
       spawn("bind", q.ldns, "dns", { label: "CNAME + NS", onArrive: () => {
-        const C = CACHE[q.ldns]; C.cname[wk] = S.now + BIND_TTL; C.ns = S.now + BIND_TTL;
+        const C = CACHE[q.ldns]; C.cname[wk] = S.now + BIND_TTL; C.ns = S.now + BIND_TTL; C.nsInt = int;
         const g = pickListener();
         guideStep(q, q.ldns, `LDNS caches the CNAME and the delegation for ${BIND_TTL} s. It follows the CNAME and asks one of the delegated listeners, ${g} at ${lsnr(g, q.ldns)}${int ? "" : `, which the ${DC[N[g].dc].name} edge firewall NATs to ${N[g].listener}`}, for <b>${WIPS[wk].name}</b>.`, () => askGtm(q, g, 0));
       } }));
@@ -763,6 +817,15 @@ function askBind(q) {
 }
 function askGtm(q, g, attempt) {
   const wk = q.wk, W = WIPS[wk], int = isInt(q.ldns), pool = poolFor(W, q.ldns);
+  /* a referral copied from BIND's internal view sends an internet resolver to private listener addresses */
+  if (!int && CACHE[q.ldns].nsInt) {
+    const priv = `${N["gtm-nyc"].listener} and ${N["gtm-sea"].listener}`;
+    q.path.push(`${N[g].listener} (unreachable)`);
+    spawn(q.ldns, g, "dns", { label: `${W.name} A?`, drop: true });
+    addTimer(4, () => guideStep(q, q.ldns, `The gtm.chala.info referral points at ${priv}, private addresses from BIND's internal view. An internet resolver can't route to them, so its queries time out and the client gets SERVFAIL.`, () =>
+      fail(q, "SERVFAIL", `the gtm.chala.info referral points to private listener addresses ${priv}`, "—", "referral")));
+    return;
+  }
   spawn(q.ldns, g, "dns", { label: `${W.name} A?`, onArrive: () => {
     if (!N[g].up) {
       flash(N[g].x, N[g].y, "r");
@@ -805,6 +868,262 @@ function fail(q, ans, why, g = "—", method = "—") {
   logDns(q, ans, "", { g, method, why });
   const L = N[q.ldns];
   spawn(q.ldns, L.client, "dns", { label: ans, onArrive: () => guideStep(q, L.client, `The client gets <b>${ans}</b>: ${why}.`, null) });
+}
+
+function replyStatic(q, ip, d) {
+  const L = N[q.ldns];
+  logDns(q, ip, "", d);
+  spawn(q.ldns, L.client, "dns", { label: ip, onArrive: () => guideStep(q, L.client, `The client gets ${fqdn(q.wk)} A <b>${ip}</b>.`, null) });
+}
+
+/* ---------- DNS Express: zxfrd keeps a copy of chala.info that TMM answers from ---------- */
+const STATICS = ["www", "shop", "intranet"];
+const isStatic = k => STATICS.includes(k);
+const pickStatic = () => { const l = ["www", "www", "intranet", ...(ZB.shop ? ["shop", "shop"] : [])]; return l[Math.floor(Math.random() * l.length)]; };
+const SOA_REFRESH = 3600, SOA_RETRY = 600, SOA_EXPIRE = 1209600, NEG_TTL = 300, HOST_TTL = 60, XFR_TIMEOUT = 30, RR_BYTES = 320, BULK = 1800000;
+const UNH = { allow: "allow (send to the listener's pool: BIND)", reject: "reject (REFUSED)", drop: "drop (no reply)", "no-error": "no-error (empty NOERROR)" };
+const rkey = r => `${r.n}|${r.t}|${r.d}`;
+const dxView = () => DX.tsig ? "external" : "internal";
+const recCount = (recs, bulk) => recs.length + 1 + bulk;
+const memMB = n => Math.max(1, Math.ceil(n * RR_BYTES / 1048576));
+const limMB = g => DX.hp[g] * 2;
+const nfmt = n => n.toLocaleString("en-US");
+/* the records of one BIND view, without the SOA (its serial is ZB.serial) */
+function zoneRecs(view) {
+  const pub = view === "external", l = g => pub ? N[g].pub : N[g].listener, R = [];
+  const r = (n, t, d, c, ttl) => R.push({ n, t, d, c, ttl });
+  if (DX.on && pub) { r("@", "NS", "gtm-nyc.chala.info.", "public name servers: the BIG-IP listeners answer from DNS Express, ns1 is a hidden primary"); r("@", "NS", "gtm-sea.chala.info."); }
+  else r("@", "NS", "ns1.chala.info.");
+  r("ns1", "A", N.bind.ip);
+  r("gtm", "NS", "gtm-nyc.chala.info.", `gtm.chala.info is delegated to the BIG-IP DNS listeners (${pub ? "public, NATed at each edge" : "internal addresses"})`);
+  r("gtm", "NS", "gtm-sea.chala.info.");
+  r("gtm-nyc", "A", l("gtm-nyc"));
+  r("gtm-sea", "A", l("gtm-sea"));
+  WKEYS.forEach((w, i) => r(w, "CNAME", WIPS[w].name + ".", i ? "" : "each app is a CNAME into the delegated subdomain, where a wide IP answers"));
+  r("www", "A", ZB.www, "web site, short TTL so changes spread fast", HOST_TTL);
+  if (ZB.shop) r("shop", "A", "203.0.113.81", "", HOST_TTL);
+  if (!pub) r("intranet", "A", "10.1.50.10", "internal-only records", HOST_TTL);
+  return R;
+}
+function answerFrom(recs, wk) {
+  const hit = recs.filter(r => r.n === wk);
+  if (!hit.length) return { rc: "NXDOMAIN" };
+  const c = hit.find(r => r.t === "CNAME");
+  if (c) {
+    const a = id => (recs.find(r => r.n === id && r.t === "A") || {}).d;
+    const ns = [a("gtm-nyc"), a("gtm-sea")];
+    return { rc: "NOERROR", cname: c.d.replace(/\.$/, ""), ns, nsInt: ns.every(x => x && x.startsWith("10.")) };
+  }
+  const a = hit.find(r => r.t === "A");
+  return a ? { rc: "NOERROR", a: a.d, ttl: a.ttl || BIND_TTL } : { rc: "NOERROR", nodata: true };
+}
+const ansLabel = r => r.rc !== "NOERROR" ? r.rc : r.a || (r.cname ? "CNAME + NS" : "NOERROR, no data");
+/* lab view: how a device's copy compares with what BIND would transfer to it right now */
+function dxDiff(g) {
+  const z = DX.z[g]; if (!z.recs) return null;
+  const want = zoneRecs(dxView()), have = new Set(z.recs.map(rkey)), wset = new Set(want.map(rkey));
+  return { missing: want.filter(r => !have.has(rkey(r))), extra: z.recs.filter(r => !wset.has(rkey(r))), stale: z.serial !== ZB.serial || z.bulk !== ZB.bulk, wrongView: z.view !== "external" };
+}
+function dxState(g) {
+  const z = DX.z[g];
+  if (!DX.on) return { c: "k", t: "DNS Express off" };
+  if (!N[g].up) return { c: "k", t: "device off" };
+  if (!DX.zoneEn) return { c: "k", t: "dns-express-enabled no" };
+  const busy = z.busy && z.xfr !== "SOA" ? `${z.xfr} in progress, ${Math.round(z.prog * 100)}%` : "";
+  if (!z.recs) return { c: "r", t: busy ? `no zone data · ${busy}` : "no zone data loaded" };
+  const d = dxDiff(g), tail = busy ? ` · ${busy}` : "";
+  if (d.wrongView) return { c: "r", t: `serial ${z.serial}, but this is BIND's ${z.view} view${tail}` };
+  const nd = d.missing.length + d.extra.length;
+  if (d.stale || nd) return { c: "y", t: `serial ${z.serial}${d.stale ? `, BIND has ${ZB.serial}` : ""}${nd ? `, ${nd} record${nd > 1 ? "s differ" : " differs"}` : ""}${tail}` };
+  return { c: "g", t: `serial ${z.serial}, in sync with BIND${tail}` };
+}
+function memText(g) {
+  const z = DX.z[g], used = z.recs ? memMB(z.count) : 0, lim = limMB(g);
+  return `${used} MB used · ${lim ? `${lim} MB reserved (dnsexpress.hugepages ${DX.hp[g]})` : "disk database (/shared/zxfrd)"}`;
+}
+
+/* zxfrd: SOA check, then IXFR, or AXFR when there's no copy yet */
+function zxfrDone(g, ok) {
+  const z = DX.z[g];
+  z.busy = false; z.prog = 0; z.xfr = "";
+  z.next = S.now + (ok ? SOA_REFRESH : SOA_RETRY);
+  if (z.again) { z.again = false; z.next = S.now + 1; }
+}
+function zxfrStart(g, why, full) {
+  const z = DX.z[g], ip = N.bind.ip;
+  if (!DX.on || !DX.zoneEn || !N[g].up) return;
+  if (z.busy) { z.again = true; return; }
+  z.busy = true; z.xfr = "SOA";
+  if (!z.recs || full) { xfer(g, "AXFR"); return; }
+  const gen = z.gen;
+  spawn(g, "bind", "xfr", { label: "SOA?", onArrive: () => {
+    if (z.gen !== gen) return;
+    if (!N.bind.up) { flash(N.bind.x, N.bind.y, "r"); addTimer(5, () => { if (z.gen !== gen) return; z.fails++; z.err = `SOA query to ${ip} timed out`; log(g, "err", "zxfrd", `SOA query for zone chala.info to ${ip} timed out; retry in ${SOA_RETRY} s`); zxfrDone(g, false); }); return; }
+    spawn("bind", g, "xfr", { label: `SOA ${ZB.serial}`, onArrive: () => {
+      if (z.gen !== gen) return;
+      if (ZB.serial > z.serial) { xfer(g, "IXFR"); return; }
+      if (ZB.serial < z.serial) {
+        z.err = `primary serial ${ZB.serial} is lower than local serial ${z.serial}`;
+        log(g, "warning", "zxfrd", `Zone chala.info: serial ${ZB.serial} on ${ip} is lower than local serial ${z.serial}, not transferring (${why})`);
+      } else log(g, "info", "zxfrd", `Zone chala.info is up to date: serial ${z.serial} on ${ip} (${why})`);
+      zxfrDone(g, true);
+    } });
+  } });
+}
+function xfer(g, type) {
+  const z = DX.z[g], ip = N.bind.ip, view = dxView(), want = zoneRecs(view), bulk = ZB.bulk, serial = ZB.serial, gen = z.gen;
+  const need = memMB(recCount(want, bulk)), lim = limMB(g);
+  let del = [], add = want;
+  if (type === "IXFR") {
+    const have = new Set(z.recs.map(rkey)), next = new Set(want.map(rkey));
+    del = z.recs.filter(r => !next.has(rkey(r))); add = want.filter(r => !have.has(rkey(r)));
+  }
+  const big = type === "AXFR" ? bulk : Math.abs(bulk - z.bulk);
+  /* an IXFR with both deletions and additions spans two messages here */
+  const msgs = big ? 6 : type === "IXFR" && del.length && add.length ? 2 : 1;
+  z.xfr = type; z.prog = 0;
+  log(g, "notice", "zxfrd", `Requesting ${type} of zone chala.info from ${ip}${DX.tsig ? " with TSIG key dnsx-ext" : ""} (local serial ${z.serial || "none"})`);
+  const fail = why => {
+    if (z.gen !== gen) return;
+    z.fails++; z.last = `${type} failed`; z.err = why;
+    log(g, "err", "zxfrd", `Zone transfer of chala.info from ${ip} failed: ${why}. Keeping ${z.recs ? `serial ${z.serial}` : "no zone data"}; retry in ${SOA_RETRY} s`);
+    zxfrDone(g, false);
+  };
+  const done = () => {
+    z.serial = serial; z.bulk = bulk; z.view = view; z.count = recCount(z.recs, bulk); z.lastXfr = S.now; z.last = `${type} complete`; z.err = "";
+    log(g, "notice", "zxfrd", `Zone transfer of chala.info complete: serial ${serial}, ${nfmt(z.count)} records (${type} from ${ip}, ${msgs} message${msgs > 1 ? "s" : ""})`);
+    zxfrDone(g, true);
+  };
+  const msg = k => {
+    const drop = !!DX.mtu[N[g].dc];
+    spawn("bind", g, "xfr", { label: `${type} ${k}/${msgs}`, drop, onArrive: () => {
+      if (z.gen !== gen) return;
+      if (!DX.on || !N[g].up) { zxfrDone(g, false); return; }
+      z.prog = k / msgs;
+      if (lim && need * k / msgs > lim) { oom(g, need, lim); return; }
+      /* the IXFR defect: only the first message (the deletions) is applied, yet the transfer is reported complete */
+      if (type === "IXFR" && msgs === 2 && k === 1 && DX.ixfrBug[g]) {
+        const gone = new Set(del.map(rkey));
+        z.recs = z.recs.filter(r => !gone.has(rkey(r)));
+        done(); return;
+      }
+      if (k < msgs) msg(k + 1);
+      else { z.recs = want.map(r => ({ ...r })); done(); }
+    } });
+    if (drop) addTimer(XFR_TIMEOUT, () => fail(`timed out after ${XFR_TIMEOUT} s waiting for message ${k} of ${msgs} of the ${type} response`));
+  };
+  spawn(g, "bind", "xfr", { label: `${type}?`, onArrive: () => {
+    if (z.gen !== gen) return;
+    if (!N.bind.up) { flash(N.bind.x, N.bind.y, "r"); addTimer(5, () => fail(`no answer from ${ip}`)); return; }
+    msg(1);
+  } });
+}
+function oom(g, need, lim) {
+  const z = DX.z[g];
+  z.oom++; z.fails++; z.gen++; z.last = "zxfrd killed (out of memory)";
+  z.err = `zone needs about ${need} MB, dnsexpress.hugepages ${DX.hp[g]} reserves ${lim} MB`;
+  flash(N[g].x, N[g].y, "r");
+  log(g, "err", "zxfrd", `DNS Express database out of memory (${lim} MB reserved by dnsexpress.hugepages ${DX.hp[g]}); zone transfer of chala.info aborted`);
+  log(g, "err", "bigstart", "zxfrd exited on signal 9 (Out of memory), restarting");
+  if (!DX.persist) { z.recs = null; z.serial = 0; z.bulk = 0; z.view = ""; z.count = 0; }
+  z.busy = false; z.prog = 0; z.xfr = ""; z.again = false; z.next = S.now + 15;
+  addTimer(3, () => log(g, "notice", "zxfrd", DX.persist ? `zxfrd started, loaded chala.info serial ${z.serial} from the persisted database` : "zxfrd started; dnsexpress.persisthugepages is false, so no zone data survived the restart. A full zone transfer is needed"));
+}
+/* BIND sends NOTIFY from its notify-source; DNS Express accepts it only from the zone's server or allow-notify list */
+function notifyAll() {
+  for (const g of GTMS) {
+    spawn("bind", g, "xfr", { label: "NOTIFY", onArrive: () => {
+      if (!DX.on || !N[g].up) return;
+      const z = DX.z[g], src = ZB.nsrc;
+      if (src !== N.bind.ip && !DX.allow54) {
+        z.notIgn++; flash(N[g].x, N[g].y, "r");
+        log(g, "warning", "tmm", `DNS Express: NOTIFY for zone chala.info from ${src} dropped: source is not the DNS Express server (${N.bind.ip}) or in Allow NOTIFY From`);
+        return;
+      }
+      z.notOk++;
+      log(g, "notice", "zxfrd", `Received NOTIFY for zone chala.info from ${src}, serial ${ZB.serial}`);
+      zxfrStart(g, "NOTIFY");
+    } });
+  }
+}
+function publish(what, f, serial) {
+  f(); ZB.serial = serial || ZB.serial + 1;
+  log("bind", "notice", "named", `(lab) db.chala.info edited: ${what}`);
+  for (const v of ["internal", "external"]) log("bind", "notice", "named", `zone chala.info/IN/${v}: loaded serial ${ZB.serial}`);
+  if (DX.on) addTimer(1, () => { log("bind", "info", "named", `zone chala.info/IN/external: sending notifies (serial ${ZB.serial})`); notifyAll(); });
+}
+function forceAxfr(g) {
+  const z = DX.z[g];
+  z.gen++; z.busy = false; z.again = false; z.recs = null; z.serial = 0; z.bulk = 0; z.view = ""; z.count = 0;
+  log(g, "notice", "bigstart", "bigstart stop zxfrd; rm -f /var/db/zxfrd.bin; bigstart start zxfrd");
+  zxfrStart(g, "restart");
+}
+
+/* the listener: wide IP (none for these names), then DNS Express, then the DNS cache, then the unhandled query action */
+function askListener(q, g, attempt) {
+  const wk = q.wk, name = fqdn(wk), other = GTMS.find(x => x !== g);
+  const retry = why => {
+    if (attempt < 1) guideStep(q, q.ldns, `${why} The resolver tries the other chala.info name server, ${other}.`, () => askListener(q, other, attempt + 1));
+    else fail(q, "SERVFAIL", `no chala.info name server gave a usable answer (last: ${why.replace(/\.$/, "")})`, g, "listener");
+  };
+  spawn(q.ldns, g, "dns", { label: `${name} A?`, onArrive: () => {
+    if (!N[g].up) { flash(N[g].x, N[g].y, "r"); retry(`${g} doesn't answer.`); return; }
+    const z = DX.z[g], st = DX.st[g];
+    q.path.push(`${g} listener`);
+    const order = `The listener's DNS profile checks wide IPs first (${name} isn't one), then DNS Express, then the DNS cache, then the unhandled query action.`;
+    if (DX.zoneEn && z.recs) {
+      const r = answerFrom(z.recs, wk); st.dx++;
+      q.path.push("DNS Express");
+      const nx = r.rc === "NXDOMAIN";
+      const why = nx ? `DNS Express on ${g} has no ${name} in its copy of chala.info (serial ${z.serial}) and answers NXDOMAIN authoritatively` : `answered from the DNS Express copy on ${g}, serial ${z.serial}`;
+      const desc = nx ? `Its copy has no ${name}, so it answers <b>NXDOMAIN</b> with the AA bit set. The cache and BIND are never consulted.` : r.a ? `It finds <b>${name} A ${r.a}</b> and answers from memory.` : `It finds <b>${wk} CNAME ${r.cname}</b> and adds the gtm.chala.info delegation from its copy: ${r.ns.join(", ")}.`;
+      guideStep(q, g, `${order} TMM finds chala.info in DNS Express (serial ${z.serial}, loaded by zxfrd from BIND). ${desc}`, () => deliver(q, g, r, `DNS Express (${g})`, why));
+      return;
+    }
+    const lost = DX.zoneEn ? `chala.info is a DNS Express zone, but ${g} has no zone data loaded` : "DNS Express is disabled on zone chala.info";
+    if (DX.cache) {
+      const c = DX.cs[g][wk];
+      if (c && c.exp > S.now) {
+        st.cache++; q.path.push("DNS cache");
+        guideStep(q, g, `${order} ${lost}, so the DNS cache is next. It holds ${name} for ${Math.ceil(c.exp - S.now)} more s and answers.`, () => deliver(q, g, c.r, `DNS cache (${g})`, `${lost}; answered from the transparent cache`));
+        return;
+      }
+    }
+    const pre = `${order} ${lost}${DX.cache ? " and the DNS cache has no entry" : ""}, so the unhandled query action <b>${DX.unh}</b> applies`;
+    if (DX.unh !== "allow") st.unh++;
+    if (DX.unh === "reject") { guideStep(q, g, `${pre}: it answers REFUSED.`, () => spawn(g, q.ldns, "dns", { label: "REFUSED", onArrive: () => retry(`${g} answered REFUSED.`) })); return; }
+    if (DX.unh === "drop") { flash(N[g].x, N[g].y, "r"); guideStep(q, g, `${pre}: it drops the query without replying.`, () => addTimer(3, () => retry(`${g} didn't reply (query dropped).`))); return; }
+    if (DX.unh === "no-error") { guideStep(q, g, `${pre}: it answers NOERROR with an empty answer section.`, () => deliver(q, g, { rc: "NOERROR", nodata: true }, `unhandled no-error (${g})`, `${lost}; unhandled query action no-error`)); return; }
+    st.pool++; q.path.push("pool → BIND");
+    guideStep(q, g, `${pre}: the query goes to the listener's pool, dns_bind_pool, which is BIND at ${N.bind.ip}.`, () =>
+      spawn(g, "bind", "dns", { label: `${name} A?`, onArrive: () => {
+        if (!N.bind.up) { flash(N.bind.x, N.bind.y, "r"); addTimer(3, () => spawn(g, q.ldns, "dns", { label: "SERVFAIL", onArrive: () => fail(q, "SERVFAIL", `${lost}, and the pool member BIND ${N.bind.ip} isn't answering`, g, "pool → BIND") })); return; }
+        const r = answerFrom(zoneRecs(viewOf(q.ldns)), wk);
+        spawn("bind", g, "dns", { label: ansLabel(r), onArrive: () => {
+          if (DX.cache) DX.cs[g][wk] = { r, exp: S.now + (r.rc === "NXDOMAIN" ? NEG_TTL : r.ttl || BIND_TTL) };
+          deliver(q, g, r, `pool → BIND (${g})`, `${lost}; unhandled query action allow sent it to BIND${DX.cache ? ", and the answer is now cached" : ""}`);
+        } });
+      } }));
+  } });
+}
+function deliver(q, g, r, src, why) { spawn(g, q.ldns, "dns", { label: ansLabel(r), onArrive: () => ldnsGot(q, r, g, src, why) }); }
+/* what the LDNS does with an answer for a chala.info name */
+function ldnsGot(q, r, from, src, why) {
+  const C = CACHE[q.ldns], wk = q.wk, name = fqdn(wk);
+  if (r.rc === "NXDOMAIN") {
+    C.a[wk] = { neg: true, g: from, exp: S.now + NEG_TTL };
+    guideStep(q, q.ldns, `LDNS gets NXDOMAIN for ${name} and caches the negative answer for ${NEG_TTL} s, the SOA minimum. Until then it answers NXDOMAIN without asking again.`, () => fail(q, "NXDOMAIN", why, from, src));
+    return;
+  }
+  if (r.nodata) { fail(q, "NOERROR, no data", why, from, src); return; }
+  if (r.a) {
+    C.a[wk] = { ip: r.a, member: "", g: from, exp: S.now + r.ttl };
+    guideStep(q, q.ldns, `LDNS caches ${name} A ${r.a} for ${r.ttl} s and returns it to the client.`, () => replyStatic(q, r.a, { g: from, method: src, why }));
+    return;
+  }
+  C.cname[wk] = S.now + BIND_TTL; C.ns = S.now + BIND_TTL; C.nsInt = r.nsInt;
+  const g = pickListener(), bad = r.nsInt && !isInt(q.ldns);
+  guideStep(q, q.ldns, `LDNS caches the CNAME and the gtm.chala.info delegation for ${BIND_TTL} s and follows the CNAME to a gtm.chala.info name server, ${g}, at <b>${bad ? N[g].listener : lsnr(g, q.ldns)}</b>${bad ? ", the private address the referral gave it" : ""}.`, () => askGtm(q, g, 0));
 }
 
 /* ---------- guided hints: pause at each hop until Next ---------- */
@@ -927,7 +1246,78 @@ const SCEN = {
     sel: "ldns-a",
     setup() { addTimer(6, () => { dnsQuery("ldns-a", "app3"); dnsQuery("ldns-b", "app3"); }); },
   },
+  dx: {
+    group: "DNS Express",
+    title: "DNS Express: hidden primary BIND",
+    text: "BIND becomes a hidden primary. Each BIG-IP DNS runs zxfrd, which pulls chala.info from BIND's external view (selected with TSIG key dnsx-ext) into DNS Express, and the listeners answer internet resolvers from that copy. The office resolver still asks BIND's internal view. Press Start: both devices load the zone with AXFR, then an internet client looks up www.chala.info and app1.chala.info with a hint at each hop. At 14:03:20 the BIND admin adds shop.chala.info.",
+    watch: ["Green zone-transfer packets: each zxfrd sends AXFR? to BIND and gets the zone back. The dnsx light on each BIG-IP DNS turns green.", "The internet lookups go to a BIG-IP listener, never to BIND. For app1 DNS Express returns the CNAME and the gtm.chala.info delegation, and gtmd then answers the wide IP.", "At 14:03:20 BIND loads serial 2026102702 and sends NOTIFY. Each zxfrd checks the SOA serial and pulls the change with IXFR.", "Open the show ltm dns zone tab for serials, record counts and how each query was answered, plus a dnsxdump of the copy.", "Stop named on BIND: DNS Express keeps answering from memory, and only the office resolver is affected."],
+    fix: "Turn on the DNS cache option above: its hit counter stays at 0, because DNS Express answers first. Then untick dns-express-enabled in Configuration to watch the cache and the BIND pool take over.",
+    opts: true,
+    sel: "gtm-nyc",
+    setup() { dxEnable(); S.dnsOn = false; addTimer(20, () => dnsQuery("ldns-b", "www", true, () => dnsQuery("ldns-b", "app1", true))); addTimer(80, () => publish("added shop.chala.info A 203.0.113.81", () => { ZB.shop = true; })); },
+  },
+  dxmem: {
+    group: "DNS Express",
+    title: "DNS Express: zone transfer runs out of memory",
+    text: "Both BIG-IP DNS devices keep DNS Express data in hugepages memory with dnsexpress.persisthugepages false. gtm-nyc has dnsexpress.hugepages 512 (1 GB). gtm-sea was built from an older template with 256 (512 MB). At 14:02:40 an asset-inventory sync adds 1.8 million host records to chala.info, about 550 MB of DNS Express data.",
+    watch: ["Both devices get NOTIFY and start a six-message IXFR. gtm-nyc finishes. gtm-sea runs out of reserved memory on the last message.", "The log shows zxfrd killed for running out of memory. Because nothing persisted, it comes back with no zone data, asks for a full AXFR, and runs out of memory again: a restart loop.", "With no zone data, queries that reach gtm-sea fall through to the DNS cache and the unhandled query action. With allow they reach BIND through dns_bind_pool, so they still work but load the hidden primary.", "Try the options above: turn on the DNS cache and repeat lookups to gtm-sea come from the cache. Set the unhandled query action to reject or drop and half the internet lookups fail over to gtm-nyc or die."],
+    fix: "Click gtm-sea and raise dnsexpress.hugepages to 512 (this restarts TMM), or click BIND and remove the inventory import.",
+    opts: true,
+    sel: "gtm-sea",
+    setup() { dxEnable(); DX.hp = { "gtm-nyc": 512, "gtm-sea": 256 }; DX.persist = false; addTimer(40, () => publish(`added $INCLUDE inventory.chala.info.db (${nfmt(BULK)} host records)`, () => { ZB.bulk = BULK; })); },
+  },
+  dxpartial: {
+    group: "DNS Express",
+    title: "DNS Express: incomplete IXFR applied halfway",
+    text: "At 14:02:40 the BIND admin moves www.chala.info from 203.0.113.80 to 203.0.113.85 and adds shop.chala.info. The IXFR response carries the deletions in one message and the additions in the next. gtm-sea runs a version with a known defect (F5 bug 667542): zxfrd applies only the first message of a multi-message IXFR, then reports the transfer as complete.",
+    watch: ["Both devices log Zone transfer complete with serial 2026102702. On gtm-sea, though, the old www record is gone and nothing replaced it.", "Internet lookups that land on gtm-sea get an authoritative NXDOMAIN for www and shop. The resolver caches that for 300 s, so the failure sticks. Lookups that land on gtm-nyc work: an intermittent outage.", "Later SOA checks say up to date, because the serial matches. The zone never repairs itself.", "The DNS cache option doesn't help: DNS Express answers NXDOMAIN before the cache is consulted."],
+    fix: "Click gtm-sea and force a full AXFR (stop zxfrd, delete /var/db/zxfrd.bin, start zxfrd). Then rndc flush the ISP resolver to drop its cached NXDOMAINs.",
+    opts: true,
+    sel: "gtm-sea",
+    setup() { dxEnable(); DX.ixfrBug["gtm-sea"] = true; addTimer(40, () => publish("www.chala.info moved to 203.0.113.85, added shop.chala.info", () => { ZB.www = "203.0.113.85"; ZB.shop = true; })); },
+  },
+  dxcut: {
+    group: "DNS Express",
+    title: "DNS Express: zone transfer cut off mid-stream",
+    text: "At 14:02:30 traffic between the DMZ and dc_sea moves to a new IPsec tunnel, and a firewall blocks the ICMP fragmentation-needed messages that path MTU discovery depends on. Small packets still pass. At 14:02:45 BIND publishes a change: www moves to 203.0.113.85 and shop.chala.info is added.",
+    watch: ["NOTIFY and the SOA query are small, so they get through, and gtm-sea starts an IXFR.", "The transfer response fills full-size TCP segments, which the tunnel drops. zxfrd waits 30 s, logs the transfer as failed, keeps serving serial 2026102701, and retries every 600 s (the SOA retry).", "gtm-sea keeps answering the old www address and NXDOMAIN for shop, while gtm-nyc has the new data. Its dnsx light turns yellow.", "Unlike the IXFR defect, this failure is visible: the serial is behind and the log shows the error."],
+    fix: "Click the dc_sea data center and fix the path MTU (clamp TCP MSS on the tunnel), then click gtm-sea and run an SOA check now instead of waiting for the retry.",
+    opts: true,
+    sel: "gtm-sea",
+    setup() { dxEnable(); addTimer(30, () => { DX.mtu.sea = true; log("gtm-sea", "notice", "shell", "(lab) DMZ ↔ dc_sea traffic now runs over an IPsec tunnel; ICMP fragmentation-needed is blocked"); render(); }); addTimer(45, () => publish("www.chala.info moved to 203.0.113.85, added shop.chala.info", () => { ZB.www = "203.0.113.85"; ZB.shop = true; })); },
+  },
+  dxview: {
+    group: "DNS Express",
+    title: "DNS Express: split DNS leak from the wrong view",
+    text: "The DNS Express nameserver object ns1_hidden has no TSIG key. BIND picks the view by source address, and zxfrd connects from the BIG-IP self IPs (10.1.10.5 and 10.2.10.5), which match internal_nets. Both devices load BIND's internal view of chala.info and serve it to the internet.",
+    watch: ["Both copies load without a single error: the dnsx lights are red only because this lab knows which view should have been used.", "At 14:02:20 an internet lookup of intranet.chala.info gets 10.1.50.10. An internal-only record has leaked.", "At 14:02:26 an internet lookup of app1.chala.info gets a gtm.chala.info referral to 10.1.10.53 and 10.2.10.53. The ISP resolver can't reach those private addresses, so every app fails with SERVFAIL.", "dnsxdump shows gtm-nyc and gtm-sea with 10.x addresses and the intranet record."],
+    fix: "In Configuration, set the TSIG key on the nameserver object. Nothing changes yet: the serial is the same in both views, so the SOA check says up to date. Click each BIG-IP DNS and force a full AXFR, then rndc flush the ISP resolver.",
+    opts: true,
+    sel: "ldns-b",
+    setup() { dxEnable(); DX.tsig = false; addTimer(20, () => dnsQuery("ldns-b", "intranet")); addTimer(26, () => dnsQuery("ldns-b", "app1")); },
+  },
+  dxnotify: {
+    group: "DNS Express",
+    title: "DNS Express: NOTIFY dropped",
+    text: "BIND is multi-homed and its notify-source is 192.0.2.54, while the DNS Express nameserver object points at 192.0.2.53 and Allow NOTIFY From is empty. Initial transfers work, because zxfrd starts those itself. At 14:02:40 the admin adds shop.chala.info.",
+    watch: ["Both listeners drop the NOTIFY from 192.0.2.54 (red flash and a warning in the log).", "No transfer starts. shop.chala.info is NXDOMAIN on the internet until each device's next SOA refresh, up to 3600 s after its last transfer. The office resolver, which asks BIND, gets it at once.", "Speed up to 20× and watch the refresh timer under each BIG-IP DNS: the change arrives about an hour late."],
+    fix: "In Configuration, add 192.0.2.54 to Allow NOTIFY From, or click BIND and set notify-source back to 192.0.2.53. Then publish another change from the BIND panel.",
+    opts: true,
+    sel: "gtm-nyc",
+    setup() { dxEnable(); ZB.nsrc = "192.0.2.54"; addTimer(40, () => publish("added shop.chala.info A 203.0.113.81", () => { ZB.shop = true; })); },
+  },
+  dxserial: {
+    group: "DNS Express",
+    title: "DNS Express: serial number went backwards",
+    text: "At 14:02:40 the BIND admin restores db.chala.info from last night's backup, adds shop.chala.info and bumps the serial in the restored file, from 2026102600 to 2026102601. That's lower than 2026102701, the serial both DNS Express copies already hold.",
+    watch: ["BIND sends NOTIFY and both devices accept it.", "The SOA check finds serial 2026102601 on BIND, lower than the local 2026102701. Like any secondary, zxfrd doesn't transfer, and logs a warning.", "shop.chala.info works from the office (BIND) but is NXDOMAIN from the internet (DNS Express), and stays that way."],
+    fix: "Click BIND and bump the serial above the secondaries' (2026102702). NOTIFY then triggers an IXFR.",
+    opts: true,
+    sel: "bind",
+    setup() { dxEnable(); addTimer(40, () => publish("restored from last night's backup, added shop.chala.info, serial set to 2026102601", () => { ZB.shop = true; }, 2026102601)); },
+  },
 };
+function dxEnable() { DX.on = true; S.dnsOn = true; }
 /* scenarios load paused; Start begins traffic */
 function runScenario(k) {
   S.scen = k; fresh(); SCEN[k].setup(); syncInst();
@@ -943,6 +1333,7 @@ function secondTick() {
   for (const l of LTMS) if (S.now >= N[l].nextBig) { N[l].nextBig += MONS.bigip.interval; runBigip(l); }
   for (const i of INST) if (i.mon !== "bigip" && S.now >= i.next) { i.next = S.now + MONS[i.mon].interval; runCustom(i); }
   checkTimeouts();
+  if (DX.on) for (const g of GTMS) { const z = DX.z[g]; if (N[g].up && !z.busy && S.now >= z.next) zxfrStart(g, z.recs ? "SOA refresh timer" : "initial load"); }
   if (S.dnsOn && S.now >= S.nextDns) { S.nextDns = S.now + 5 + Math.random() * 4; dnsQuery(); }
 }
 function step() {
@@ -1001,9 +1392,10 @@ function buildSvg() {
       txt({ x: -54, y: -12, class: "nname" }, n.id, g);
       txt({ x: 54, y: -12, class: "ntag", "text-anchor": "end" }, n.dns ? "DNS" : "LTM", g);
       txt({ x: -54, y: 3, class: "nip" }, n.ip, g);
-      if (n.dns) { el("circle", { cx: -50, cy: 17, r: 4, class: "light", id: "Lg-" + n.id }, g); txt({ x: -43, y: 20, class: "lt" }, "gtmd", g); }
-      el("circle", { cx: n.dns ? 0 : -50, cy: 17, r: 4, class: "light", id: "Lb-" + n.id }, g);
-      txt({ x: n.dns ? 7 : -43, y: 20, class: "lt" }, "big3d", g);
+      if (n.dns) { el("circle", { cx: -52, cy: 17, r: 4, class: "light", id: "Lg-" + n.id }, g); txt({ x: -45, y: 20, class: "lt" }, "gtmd", g); }
+      el("circle", { cx: n.dns ? -14 : -50, cy: 17, r: 4, class: "light", id: "Lb-" + n.id }, g);
+      txt({ x: n.dns ? -7 : -43, y: 20, class: "lt" }, "big3d", g);
+      if (n.dns) { const x = el("g", { id: "Xg-" + n.id }, g); el("circle", { cx: 30, cy: 17, r: 4, class: "light", id: "Lx-" + n.id }, x); txt({ x: 37, y: 20, class: "lt" }, "dnsx", x); }
     } else if (n.kind === "vs") {
       el("rect", { x: -84, y: -19, width: 168, height: 38, rx: 8, class: "nb" }, g);
       el("circle", { cx: -70, cy: 0, r: 5.5, id: "D-" + n.id }, g);
@@ -1023,7 +1415,7 @@ function buildSvg() {
       el("rect", { x: -66, y: -26, width: 132, height: 52, rx: 6, class: "nb" }, g);
       txt({ x: 0, y: -8, class: "nname", "text-anchor": "middle" }, "BIND", g);
       txt({ x: 0, y: 6, class: "nip", "text-anchor": "middle" }, `ns1 · ${n.ip}`, g);
-      txt({ x: 0, y: 19, class: "ntag", "text-anchor": "middle" }, "2 VIEWS · chala.info", g);
+      txt({ x: 0, y: 19, class: "ntag", "text-anchor": "middle", id: "bindtag" }, "2 VIEWS · chala.info", g);
     } else if (n.kind === "ldns") {
       el("rect", { x: -70, y: -24, width: 140, height: 48, rx: 24, class: "nb" }, g);
       txt({ x: 0, y: -4, class: "nname", "text-anchor": "middle" }, `LDNS ${n.id.slice(-1).toUpperCase()} · ${n.internal ? "internal" : "ISP"}`, g);
@@ -1049,6 +1441,7 @@ function renderSvg() {
     if (n.kind === "bigip") {
       if (n.dns) $("#Lg-" + n.id).setAttribute("class", lightCls(n.up, false));
       $("#Lb-" + n.id).setAttribute("class", lightCls(n.up && n.big3d, n.up));
+      if (n.dns) { $("#Xg-" + n.id).style.display = DX.on ? "" : "none"; $("#Lx-" + n.id).setAttribute("class", "light c-" + dxState(n.id).c); }
     }
   }
   const vg = S.viewGtm, vUp = N[vg].up;
@@ -1057,6 +1450,7 @@ function renderSvg() {
     $("#D-" + v).setAttribute("class", vUp ? "c-" + DOTC[memberSt(vg, v).st] : "c-k");
     $("#AE-" + v).textContent = !n.vsUp ? (n.kind === "generic" ? "stopped" : "VS down") : !n.appOk ? "app 503" : "";
   }
+  $("#bindtag").textContent = DX.on ? "HIDDEN PRIMARY" : "2 VIEWS · chala.info";
   const asg = $("#assign"); asg.innerHTML = "";
   if (S.show.probe) for (const i of INST) {
     if (i.mon === "bigip" || !i.prober) continue;
@@ -1100,7 +1494,8 @@ function drawPackets() {
 /* ---------- side rail ---------- */
 function statusPill(st) { return `<span class="pill"><span class="dot ${DOTC[st]}"></span>${COLOR[st]}</span>`; }
 function opt(v, cur, label) { return `<option value="${v}"${v === cur ? " selected" : ""}>${esc(label || RULES[v])}</option>`; }
-function lookupButtons(ldns) { return WKEYS.map(w => `<button data-act="dnsq:${ldns}:${w}">Look up ${w}</button>`).join(""); }
+const lookupKeys = () => DX.on ? [...WKEYS, ...STATICS] : WKEYS;
+function lookupButtons(ldns) { return lookupKeys().map(w => `<button data-act="dnsq:${ldns}:${w}">Look up ${w}</button>`).join(""); }
 function proberFields(n, note) {
   return `<div class="field"><label for="f-pref">Prober preference${note}</label><select id="f-pref" data-set="pref:${n.id}">${opt("inherit", n.pref, `Inherit from data center (${RULES[DC[n.dc].pref]})`)}${PREF_OPTS.map(o => opt(o, n.pref)).join("")}</select></div>
   <div class="field"><label for="f-fb">Prober fallback</label><select id="f-fb" data-set="fb:${n.id}">${opt("inherit", n.fb, `Inherit from data center (${RULES[DC[n.dc].fb]})`)}${FB_OPTS.map(o => opt(o, n.fb)).join("")}</select></div>`;
@@ -1121,6 +1516,15 @@ function renderInspector() {
         <button data-act="big3d:${n.id}" ${n.up ? "" : "disabled"}>${n.big3d ? "bigstart stop big3d" : "bigstart start big3d"}</button>
         ${n.dns ? `<button data-act="viewas:${n.id}">Show status as ${n.id}</button>` : ""}
       </div>`;
+      if (n.dns && DX.on) {
+        const hp = DX.hp[n.id];
+        h += `<div class="live" id="dxlive"></div><div class="acts">
+        <button data-act="dxx:${n.id}" ${n.up ? "" : "disabled"}>SOA check now</button>
+        <button data-act="dxaxfr:${n.id}" ${n.up ? "" : "disabled"}>Force full AXFR</button>
+        ${hp && hp < 1024 ? `<button class="primary" data-act="dxhp:${n.id}:${hp * 2}">Set dnsexpress.hugepages ${hp * 2} and restart TMM</button>` : ""}
+        ${DX.cache ? `<button data-act="dxcflush:${n.id}">Flush DNS cache</button>` : ""}
+        <button data-act="tab:dnsx">show ltm dns zone</button></div>`;
+      }
       if (vss.length) h += `<span class="lbl">Virtual servers</span><div class="acts">${vss.map(v => `<button data-act="pick:${v}">${v}</button>`).join("")}</div>`;
     } else if (n.kind === "vs" || n.kind === "generic") {
       const W = WIPS[n.wip], gen = n.kind === "generic";
@@ -1138,6 +1542,19 @@ function renderInspector() {
       <dl class="kv"><dt>Address</dt><dd>${n.ip}:53</dd><dt>Authoritative for</dt><dd>chala.info</dd><dt>View internal</dt><dd>match-clients ${INTERNAL_NET} · gtm NS ${N["gtm-nyc"].listener}, ${N["gtm-sea"].listener}</dd><dt>View external</dt><dd>match-clients any · gtm NS ${N["gtm-nyc"].pub}, ${N["gtm-sea"].pub}</dd><dt>named</dt><dd>${n.up ? "running" : "stopped"}</dd></dl>
       <p class="small" style="margin:0">BIND never sees the wide IPs. In both views it answers each appN.chala.info with a CNAME to appN.gtm.chala.info and refers resolvers to BIG-IP DNS, at the listener addresses that side can reach.</p>
       <div class="acts"><button data-act="bind:x" class="${n.up ? "warn" : "primary"}">${n.up ? "Stop named" : "Start named"}</button><button data-act="tab:zone">Show named.conf and zones</button></div>`;
+      if (DX.on) {
+        const nx = Math.max(ZB.serial, ...GTMS.map(g => DX.z[g].serial)) + 1;
+        h += `<span class="lbl">Hidden primary for DNS Express</span>
+        <dl class="kv"><dt>Serial</dt><dd>${ZB.serial}</dd><dt>notify-source</dt><dd>${ZB.nsrc}</dd><dt>also-notify</dt><dd>${GTMS.map(g => N[g].listener).join(", ")} (key dnsx-ext)</dd><dt>Records</dt><dd>${nfmt(recCount(zoneRecs("external"), ZB.bulk))} in the external view</dd></dl>
+        <span class="small">Each edit reloads the zone with the next serial and sends NOTIFY.</span>
+        <div class="acts" ${n.up ? "" : "hidden"}>
+          <button data-act="zshop">${ZB.shop ? "Remove" : "Add"} shop.chala.info</button>
+          <button data-act="zwww">Move www to ${ZB.www === "203.0.113.80" ? "203.0.113.85" : "203.0.113.80"}</button>
+          <button data-act="zbulk" class="${ZB.bulk ? "primary" : ""}">${ZB.bulk ? "Remove the inventory import" : `Import ${nfmt(BULK)} inventory records`}</button>
+          <button data-act="zserial">Bump serial to ${nx}</button>
+          <button data-act="znsrc">Set notify-source ${ZB.nsrc === N.bind.ip ? "192.0.2.54" : N.bind.ip}</button>
+        </div>`;
+      }
     } else if (n.kind === "ldns") {
       h += `<h3>LDNS ${n.id.slice(-1).toUpperCase()}<span class="badge">${n.internal ? "Internal resolver" : "ISP resolver"}</span></h3>
       <dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>BIND view</dt><dd>${viewOf(n.id)}</dd><dt>GTM topology</dt><dd>${n.internal ? "in" : "not in"} internal_nets → _${n.internal ? "int" : "ext"} pools</dd><dt>Real RTT</dt><dd>dc_nyc ${n.rtt.nyc} ms · dc_sea ${n.rtt.sea} ms</dd></dl>
@@ -1147,7 +1564,7 @@ function renderInspector() {
     } else {
       const L = LDNS.find(l => N[l].client === n.id);
       h += `<h3>Client ${n.id.slice(-1).toUpperCase()}<span class="badge">${N[L].internal ? "Office" : "Internet"}</span></h3><dl class="kv"><dt>Address</dt><dd>${n.ip}</dd><dt>Uses LDNS</dt><dd>${ldnsName(L)} · ${N[L].ip}</dd><dt>Gets</dt><dd>${N[L].internal ? "internal (10.x) answers" : "public (203.0.113.x) answers"}</dd></dl>
-      <span class="lbl">Walk through a lookup, with hints</span><div class="acts">${WKEYS.map(w => `<button class="primary" data-act="guide:${L}:${w}">${fqdn(w)}</button>`).join("")}</div>
+      <span class="lbl">Walk through a lookup, with hints</span><div class="acts">${lookupKeys().map(w => `<button class="primary" data-act="guide:${L}:${w}">${fqdn(w)}</button>`).join("")}</div>
       <span class="lbl">Quick lookup</span><div class="acts">${lookupButtons(L)}</div>`;
     }
   } else if (s.k === "conn") {
@@ -1166,6 +1583,8 @@ function renderInspector() {
     <div class="field"><label for="f-dpref">Prober preference</label><select id="f-dpref" data-set="dcpref:${s.id}">${PREF_OPTS.map(o => opt(o, d.pref)).join("")}</select></div>
     <div class="field"><label for="f-dfb">Prober fallback</label><select id="f-dfb" data-set="dcfb:${s.id}">${FB_OPTS.map(o => opt(o, d.fb)).join("")}</select></div>
     <div class="live" id="live"></div>`;
+    if (DX.on) h += `<span class="lbl">Path to the DMZ (zone transfers)</span><p class="small" style="margin:0">${DX.mtu[s.id] ? "Full-size TCP segments between the DMZ and this data center are dropped and ICMP fragmentation-needed is blocked, so zone transfers stall. Small packets such as NOTIFY and SOA still pass." : "Zone transfers from BIND in the DMZ reach the BIG-IP DNS here normally."}</p>
+    <div class="acts"><button data-act="mtu:${s.id}" class="${DX.mtu[s.id] ? "primary" : "warn"}">${DX.mtu[s.id] ? "Fix path MTU (clamp TCP MSS)" : "Break path MTU from the DMZ"}</button></div>`;
   } else if (s.k === "wan") {
     h += `<h3>WAN link<span class="badge">dc_nyc ↔ dc_sea</span></h3>
     <p class="small" style="margin:0">Carries cross-DC iQuery and any monitor probe sent from a big3d in the other data center. Internet access in each DC is unaffected.</p>
@@ -1174,7 +1593,19 @@ function renderInspector() {
   box.innerHTML = h;
   renderLive();
 }
+function renderDxLive() {
+  const box = $("#dxlive"); if (!box || S.sel.k !== "node") return;
+  const g = S.sel.id, z = DX.z[g], s = dxState(g), d = dxDiff(g), st = DX.st[g];
+  let h = `<span class="lbl">DNS Express · chala.info</span><span class="pill"><span class="dot ${s.c}"></span>${esc(s.t)}</span>
+  <dl class="kv"><dt>Records</dt><dd>${nfmt(z.recs ? z.count : 0)}</dd><dt>Memory</dt><dd>${memText(g)}</dd><dt>Last transfer</dt><dd>${esc(z.last)}</dd><dt>Last success</dt><dd>${z.lastXfr != null ? ts(z.lastXfr) : "never"}</dd><dt>Next SOA check</dt><dd>${z.busy ? "transfer in progress" : !N[g].up ? "—" : `in ${Math.max(0, Math.ceil(z.next - S.now))} s`}</dd>${z.err ? `<dt>Last problem</dt><dd>${esc(z.err)}</dd>` : ""}<dt>NOTIFY</dt><dd>${z.notOk} accepted · ${z.notIgn} dropped</dd><dt>Answered by</dt><dd>DNS Express ${st.dx} · cache ${st.cache} · BIND pool ${st.pool} · unhandled ${st.unh}</dd></dl>`;
+  if (d && (d.missing.length || d.extra.length)) {
+    const f = r => `${r.n === "@" ? "chala.info" : r.n} ${r.t} ${r.d}`;
+    h += `<span class="small">Lab view, against what BIND would send now: ${d.missing.length ? `missing ${esc(d.missing.map(f).join(", "))}` : ""}${d.missing.length && d.extra.length ? "; " : ""}${d.extra.length ? `should not have ${esc(d.extra.map(f).join(", "))}` : ""}.</span>`;
+  }
+  box.innerHTML = h;
+}
 function renderLive() {
+  renderDxLive();
   const box = $("#live"); if (!box) return;
   const s = S.sel; let h = "";
   if (s.k === "node") {
@@ -1196,10 +1627,10 @@ function renderLive() {
       }
     } else if (n.kind === "ldns") {
       const C = CACHE[n.id], left = t => Math.ceil(t - S.now), rows = [];
-      if (C.ns > S.now) rows.push(`gtm.chala.info NS gtm-nyc, gtm-sea · ${left(C.ns)} s`);
-      for (const w of WKEYS) {
-        if (C.cname[w] > S.now) rows.push(`${fqdn(w)} CNAME ${WIPS[w].name} · ${left(C.cname[w])} s`);
-        const a = C.a[w]; if (a && a.exp > S.now) rows.push(`${WIPS[w].name} A ${a.ip} · ${left(a.exp)} s`);
+      if (C.ns > S.now) rows.push(`gtm.chala.info NS gtm-nyc, gtm-sea${C.nsInt && !n.internal ? " (private 10.x addresses)" : ""} · ${left(C.ns)} s`);
+      for (const w of [...WKEYS, ...STATICS]) {
+        if (!isStatic(w) && C.cname[w] > S.now) rows.push(`${fqdn(w)} CNAME ${WIPS[w].name} · ${left(C.cname[w])} s`);
+        const a = C.a[w]; if (a && a.exp > S.now) rows.push(a.neg ? `${fqdn(w)} NXDOMAIN (negative) · ${left(a.exp)} s` : `${isStatic(w) ? fqdn(w) : WIPS[w].name} A ${a.ip} · ${left(a.exp)} s`);
       }
       h += `<span class="lbl">Cache (record · TTL left)</span>` + (rows.length ? rows.map(r => `<span class="pill">${r}</span>`).join("") : `<span class="small">Empty</span>`);
       h += `<span class="lbl">Path metrics held by each gtmd</span>`;
@@ -1223,6 +1654,10 @@ function renderWip() {
     <div class="live" id="wl-${k}"></div>
     <div class="acts"><button data-act="dnsq:ldns-a:${k}">Look up from office</button><button data-act="dnsq:ldns-b:${k}">Look up from internet</button></div></div>`;
   }
+  if (DX.on) h += `<div class="pool"><div class="pool-head"><b>chala.info records</b><span class="badge">DNS Express</span></div>
+    <span class="small">Internet resolvers get these from DNS Express on the BIG-IP listeners, the office resolver from BIND's internal view.</span>
+    <div class="acts">${STATICS.map(w => `<button data-act="dnsq:ldns-b:${w}">${w} from internet</button>`).join("")}</div>
+    <div class="acts">${STATICS.map(w => `<button data-act="dnsq:ldns-a:${w}">${w} from office</button>`).join("")}</div></div>`;
   h += `<div class="acts"><label class="small" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="dnsOn" data-set="dnson:x" ${S.dnsOn ? "checked" : ""}>Generate random DNS queries</label><button data-act="page:config">Configure pools and monitors</button></div>`;
   $("#wip").innerHTML = h;
   renderWipCfg();
@@ -1299,6 +1734,29 @@ function renderPools() {
   $("#pools").innerHTML = h;
 }
 
+function dxOptsHtml() {
+  return `<label><input type="checkbox" data-set="dxcache:x" ${DX.cache ? "checked" : ""}>DNS cache on the listeners</label>
+  <label>Unhandled query action <select data-set="dxunh:x" aria-label="Unhandled query action">${Object.keys(UNH).map(v => opt(v, DX.unh, v)).join("")}</select></label>`;
+}
+function renderDxCfg() {
+  const cb = (set, on, label) => `<label class="cb"><input type="checkbox" data-set="${set}" ${on ? "checked" : ""}><span>${label}</span></label>`;
+  const hpOpt = g => [0, 128, 256, 512, 1024].map(v => opt(String(v), String(DX.hp[g]), v ? `${v} (${v * 2} MB in memory)` : "0 (disk database)")).join("");
+  let h = `<h3>DNS Express<span class="badge">chala.info</span></h3>
+  <p class="small" style="margin:0">BIND becomes a hidden primary. zxfrd on each BIG-IP DNS pulls chala.info with AXFR and IXFR, and TMM answers internet resolvers from that copy. The office resolver keeps asking BIND's internal view.</p>
+  ${cb("dxon:x", DX.on, "Serve chala.info to internet resolvers from DNS Express")}`;
+  if (DX.on) h += `<div class="pool"><span class="lbl">ltm dns zone chala.info</span>
+    ${cb("dxzone:x", DX.zoneEn, "dns-express-enabled")}
+    ${cb("dxtsig:x", DX.tsig, "TSIG key dnsx-ext on nameserver ns1_hidden (BIND then picks its external view)")}
+    ${cb("dxallow:x", DX.allow54, "Allow NOTIFY From 192.0.2.54 (BIND's second address)")}</div>
+  <div class="pool"><span class="lbl">DNS profile on the listeners</span>
+    ${cb("dxcache:x", DX.cache, "enable-cache, with transparent cache dns_cache_transparent")}
+    <div class="field"><label for="f-unh">Unhandled query action</label><select id="f-unh" data-set="dxunh:x">${Object.entries(UNH).map(([v, l]) => opt(v, DX.unh, l)).join("")}</select></div></div>
+  <div class="pool"><span class="lbl">sys db, per device</span>
+    ${GTMS.map(g => `<div class="field"><label for="hp-${g}">${g} dnsexpress.hugepages</label><select id="hp-${g}" data-set="dxhp:${g}">${hpOpt(g)}</select></div>`).join("")}
+    ${cb("dxpersist:x", DX.persist, "dnsexpress.persisthugepages (zone data survives a zxfrd or TMM restart)")}</div>`;
+  $("#dxcfg").innerHTML = h;
+}
+
 /* ---------- config text ---------- */
 function confText() {
   const tm = r => r === "inherit" ? "inherit" : r === "inside" ? "inside-datacenter" : r === "outside" ? "outside-datacenter" : r === "any" ? "any-available" : r === "none" ? "none" : "pool";
@@ -1337,44 +1795,63 @@ function confText() {
   for (const side of ["int", "ext"]) L.push(`gtm region /Common/${side === "int" ? "internal" : "external"}_pools {`, `    region-members {`, ...WKEYS.map(w => `        pool /Common/${WIPS[w].pool}_${side} { }`), `    }`, `}`);
   L.push(`gtm topology ldns: region /Common/internal_nets server: region /Common/internal_pools {`, `    score 100`, `}`, `gtm topology ldns: not region /Common/internal_nets server: region /Common/external_pools {`, `    score 100`, `}`);
   for (const W of Object.values(WIPS)) L.push(`gtm wideip a /Common/${W.name} {`, `    pool-lb-mode topology`, `    pools {`, `        /Common/${W.pool}_int { order 0 }`, `        /Common/${W.pool}_ext { order 1 }`, `    }`, `}`);
+  if (DX.on) {
+    const ip = N.bind.ip;
+    L.push(`ltm dns tsig-key /Common/dnsx-ext {`, `    algorithm hmac-sha256`, `    secret "****"`, `}`,
+      `ltm dns nameserver /Common/ns1_hidden {`, `    address ${ip}`, `    port 53`, ...(DX.tsig ? [`    tsig-key /Common/dnsx-ext`] : []), `}`,
+      `ltm dns zone /Common/chala.info {`, ...(DX.allow54 ? [`    dns-express-allow-notify { 192.0.2.54 }`] : []), `    dns-express-enabled ${DX.zoneEn ? "yes" : "no"}`, `    dns-express-notify-action consume`, `    dns-express-server /Common/ns1_hidden`, `}`,
+      ...(DX.cache ? [`ltm dns cache transparent /Common/dns_cache_transparent { }`] : []),
+      `ltm profile dns /Common/dns_express_gslb {`, ...(DX.cache ? [`    cache /Common/dns_cache_transparent`] : []), `    defaults-from /Common/dns`, `    enable-cache ${DX.cache ? "yes" : "no"}`, `    enable-dns-express yes`, `    enable-gtm yes`, `    unhandled-query-action ${DX.unh}`, `    use-local-bind no`, `}`,
+      `ltm pool /Common/dns_bind_pool {`, `    members {`, `        /Common/${ip}:53 { address ${ip} }`, `    }`, `}`);
+    for (const g of GTMS) L.push(`gtm listener /Common/lsnr_${N[g].dc} {`, `    address ${N[g].listener}`, `    ip-protocol udp`, `    pool /Common/dns_bind_pool`, `    profiles {`, `        /Common/dns_express_gslb { }`, `    }`, `}`);
+    L.push(`# sys db, set on each device: ${GTMS.map(g => `${g} dnsexpress.hugepages ${DX.hp[g]}`).join(", ")}; dnsexpress.persisthugepages ${DX.persist}`);
+  }
   return L.join("\n");
 }
 function zoneText() {
-  const pad = s => s.padEnd(9);
+  const pad = s => s.padEnd(9), dx = DX.on;
   const zone = view => {
-    const pub = view === "external", l = g => pub ? N[g].pub : N[g].listener;
-    return [
+    const L = [
       `; ---- /var/named/db.chala.info.${view}`,
       "$ORIGIN chala.info.",
       `$TTL ${BIND_TTL}`,
-      "@        IN SOA  ns1.chala.info. hostmaster.chala.info. ( 2026102701 3600 600 1209600 300 )",
-      "         IN NS   ns1.chala.info.",
-      `${pad("ns1")}IN A    ${N.bind.ip}`,
-      "",
-      `; gtm.chala.info is delegated to the BIG-IP DNS listeners (${pub ? "public, NATed at each edge" : "internal addresses"})`,
-      `${pad("gtm")}IN NS   gtm-nyc.chala.info.`,
-      `${pad("gtm")}IN NS   gtm-sea.chala.info.`,
-      `${pad("gtm-nyc")}IN A    ${l("gtm-nyc")}`,
-      `${pad("gtm-sea")}IN A    ${l("gtm-sea")}`,
-      "",
-      "; each app is a CNAME into the delegated subdomain, where a wide IP answers",
-      ...WKEYS.map(w => `${pad(w)}IN CNAME ${WIPS[w].name}.`),
-      ...(pub ? [] : ["", "; internal-only records", `${pad("intranet")}IN A    10.1.50.10`]),
+      `@        IN SOA  ns1.chala.info. hostmaster.chala.info. ( ${ZB.serial} ${SOA_REFRESH} ${SOA_RETRY} ${SOA_EXPIRE} ${NEG_TTL} )`,
     ];
+    for (const r of zoneRecs(view)) {
+      if (r.c) L.push("", `; ${r.c}`);
+      L.push(`${pad(r.n === "@" ? "" : r.n)}${r.ttl ? `${r.ttl} ` : ""}IN ${r.t.padEnd(5)} ${r.d}`);
+    }
+    if (ZB.bulk) L.push("", `; asset-inventory import: ${nfmt(ZB.bulk)} host records`, '$INCLUDE "inventory.chala.info.db"');
+    return L;
   };
   return [
     "// ---- /etc/named.conf (excerpt)",
     `acl internal_nets { ${INTERNAL_NET}; };`,
+    ...(dx ? [
+      'key "dnsx-ext" { algorithm hmac-sha256; secret "****"; };',
+      "options {",
+      `    notify-source ${ZB.nsrc};`,
+      "    ixfr-from-differences yes;   // answer IXFR with real differences",
+      "};",
+    ] : []),
     "",
     'view "internal" {',
-    "    match-clients { internal_nets; };",
+    `    match-clients { ${dx ? "!key dnsx-ext; " : ""}internal_nets; };`,
     "    recursion no;",
+    ...(dx ? ["    allow-transfer { internal_nets; };   // internal secondaries"] : []),
     '    zone "chala.info" { type master; file "db.chala.info.internal"; };',
     "};",
     'view "external" {',
-    "    match-clients { any; };",
+    `    match-clients { ${dx ? "key dnsx-ext; " : ""}any; };`,
     "    recursion no;",
-    '    zone "chala.info" { type master; file "db.chala.info.external"; };',
+    ...(dx ? [
+      '    zone "chala.info" {',
+      '        type master; file "db.chala.info.external";',
+      "        allow-transfer { key dnsx-ext; };",
+      "        notify explicit;",
+      `        also-notify { ${GTMS.map(g => `${N[g].listener} key dnsx-ext;`).join(" ")} };   // DNS Express`,
+      "    };",
+    ] : ['    zone "chala.info" { type master; file "db.chala.info.external"; };']),
     "};",
     "",
     ...zone("internal"),
@@ -1384,7 +1861,7 @@ function zoneText() {
 }
 
 /* ---------- console ---------- */
-const TABS = [["log", "/var/log/gtm"], ["dns", "DNS answers"], ["mon", "monitor instances"], ["iquery", "show gtm iquery"], ["path", "show gtm path"], ["conf", "bigip_gtm.conf"], ["zone", "named.conf / zones"], ["iqdump", "iqdump"]];
+const TABS = [["log", "/var/log/gtm"], ["dns", "DNS answers"], ["mon", "monitor instances"], ["iquery", "show gtm iquery"], ["path", "show gtm path"], ["conf", "bigip_gtm.conf"], ["zone", "named.conf / zones"], ["dnsx", "show ltm dns zone"], ["iqdump", "iqdump"]];
 function renderTabs() {
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" data-tab="${k}">${l}</button>`).join("");
   const bar = $("#cbar");
@@ -1392,9 +1869,10 @@ function renderTabs() {
   else if (S.tab === "iquery") bar.innerHTML = `<span>root@(${S.viewGtm})(cfg-sync In Sync)(Active)(/Common)(tmos)# show gtm iquery</span>`;
   else if (S.tab === "mon") bar.innerHTML = `<span>One instance per pool member per monitor: who runs it, the last probe, and what each gtmd believes</span>`;
   else if (S.tab === "path") bar.innerHTML = `<span>Path metrics learned from big3d probes of each LDNS (TTL ${PATH_TTL} s)</span>`;
-  else if (S.tab === "dns") bar.innerHTML = `<span>Lookups of appN.chala.info, newest first, with the hops each one took</span>`;
+  else if (S.tab === "dns") bar.innerHTML = `<span>Lookups of chala.info names, newest first, with the hops each one took</span>`;
   else if (S.tab === "conf") bar.innerHTML = `<span>root@(gtm-nyc)(cfg-sync In Sync)(Active)(/Common)(tmos)# list gtm (simplified)</span>`;
   else if (S.tab === "zone") bar.innerHTML = `<span>ns1.chala.info: split-horizon views and their zone files</span>`;
+  else if (S.tab === "dnsx") bar.innerHTML = `<span>root@(${S.viewGtm})(cfg-sync In Sync)(Active)(/Common)(tmos)# show ltm dns zone chala.info (both devices, simplified), then dnsxdump on ${S.viewGtm}</span>`;
   else bar.innerHTML = `<label for="iqdSel">[root@${CONN[S.iqd].g}:Active] # iqdump</label><select id="iqdSel">${Object.values(CONN).map(c => `<option value="${c.key}"${c.key === S.iqd ? " selected" : ""}>${N[c.b].ip} (gtmd@${c.g} → big3d@${c.b})</option>`).join("")}</select><span>simplified XML</span>`;
   const sel = $("#iqdSel"); if (sel) sel.onchange = e => { S.iqd = e.target.value; renderTabs(); renderConsole(); };
 }
@@ -1431,6 +1909,24 @@ function renderConsole() {
     h = `<pre class="xml">${esc(confText())}</pre>`;
   } else if (S.tab === "zone") {
     h = `<pre class="xml">${esc(zoneText())}</pre>`;
+  } else if (S.tab === "dnsx") {
+    if (!DX.on) h = `<div class="logline">DNS Express isn't in use. Load a DNS Express scenario, or turn it on in the Configuration tab.</div>`;
+    else {
+      h = `<table class="t"><thead><tr><th>Device</th><th>Zone</th><th>DNS Express</th><th>Serial</th><th>Records</th><th>Memory</th><th>Last transfer</th><th>Failures</th><th>NOTIFY ok / dropped</th><th>Answers: DNSX / cache / pool / unhandled</th></tr></thead><tbody>`;
+      for (const g of GTMS) {
+        const z = DX.z[g], st = DX.st[g], x = dxState(g);
+        h += `<tr><td>${g}</td><td>/Common/chala.info</td><td class="wrap"><span class="pill"><span class="dot ${x.c}"></span>${esc(x.t)}</span></td><td>${z.serial || "—"}</td><td>${nfmt(z.recs ? z.count : 0)}</td><td class="wrap">${memText(g)}</td><td class="wrap">${esc(z.last)}<div class="small">last success ${z.lastXfr != null ? ts(z.lastXfr) : "never"}</div>${z.err ? `<div class="small">${esc(z.err)}</div>` : ""}</td><td>${z.fails}${z.oom ? ` (${z.oom} out of memory)` : ""}</td><td>${z.notOk} / ${z.notIgn}</td><td>${st.dx} / ${st.cache} / ${st.pool} / ${st.unh}</td></tr>`;
+      }
+      h += `</tbody></table><div class="small" style="margin:6px 0 10px">BIND (hidden primary) serial ${ZB.serial}, ${nfmt(recCount(zoneRecs("external"), ZB.bulk))} records in the external view.</div>`;
+      const z = DX.z[S.viewGtm];
+      if (!z.recs) h += `<div class="logline">[root@${S.viewGtm}:Active] # dnsxdump: no zone data loaded for chala.info.</div>`;
+      else {
+        const nm = n => n === "@" ? "chala.info." : `${n}.chala.info.`;
+        const lines = [`chala.info. ${BIND_TTL} IN SOA ns1.chala.info. hostmaster.chala.info. ${z.serial} ${SOA_REFRESH} ${SOA_RETRY} ${SOA_EXPIRE} ${NEG_TTL}`, ...z.recs.map(r => `${nm(r.n)} ${r.ttl || BIND_TTL} IN ${r.t} ${r.d}`)];
+        if (z.bulk) lines.push(`… ${nfmt(z.bulk)} more host records`);
+        h += `<pre class="xml"><span class="meta">[root@${S.viewGtm}:Active] # dnsxdump (simplified)</span>\n${esc(lines.join("\n"))}</pre>`;
+      }
+    }
   } else {
     const c = CONN[S.iqd];
     h = c.msgs.map(m => `<pre class="xml"><span class="meta">${ts(m.t)}  ${m.dir}  ${N[c.g].ip} ⇄ ${N[c.b].ip}:4353</span>\n${esc(m.xml)}</pre>`).join("") || `<div class="logline">No messages on this connection${c.st !== "connected" ? ` (state: ${c.st})` : " yet"}.</div>`;
@@ -1448,12 +1944,14 @@ function renderChrome() {
   $("#legend").innerHTML = Object.entries(TYPES).map(([k, l]) => `<label><input type="checkbox" data-show="${k}" ${S.show[k] ? "checked" : ""}><span class="sw" style="background:var(--${k})"></span>${l}</label>`).join("");
 }
 function renderScen() {
-  $("#scenSel").innerHTML = Object.entries(SCEN).map(([k, v]) => `<option value="${k}"${k === S.scen ? " selected" : ""}>${v.title}</option>`).join("");
+  const groups = {};
+  for (const [k, v] of Object.entries(SCEN)) (groups[v.group || "GSLB"] = groups[v.group || "GSLB"] || []).push(`<option value="${k}"${k === S.scen ? " selected" : ""}>${v.title}</option>`);
+  $("#scenSel").innerHTML = Object.entries(groups).map(([g, o]) => `<optgroup label="${g}">${o.join("")}</optgroup>`).join("");
   const s = SCEN[S.scen];
-  $("#scenText").innerHTML = `<h2>${s.title}</h2><p>${s.text}</p><span class="lbl">What to watch</span><ul>${s.watch.map(w => `<li>${w}</li>`).join("")}</ul>${s.fix ? `<p class="fix">${s.fix}</p>` : ""}`;
+  $("#scenText").innerHTML = `<h2>${s.title}</h2><p>${s.text}</p>${s.opts ? `<div class="opts"><span class="lbl">Options</span>${dxOptsHtml()}</div>` : ""}<span class="lbl">What to watch</span><ul>${s.watch.map(w => `<li>${w}</li>`).join("")}</ul>${s.fix ? `<p class="fix">${s.fix}</p>` : ""}`;
 }
-function renderAll() { renderChrome(); renderSvg(); renderInspector(); renderWip(); renderMons(); renderPools(); renderProbeCfg(); renderTabs(); renderConsole(); }
-function render() { renderSvg(); renderInspector(); renderPools(); renderProbeCfg(); renderWipLive(); }
+function renderAll() { renderChrome(); renderSvg(); renderInspector(); renderWip(); renderMons(); renderPools(); renderProbeCfg(); renderDxCfg(); renderTabs(); renderConsole(); }
+function render() { renderSvg(); renderInspector(); renderPools(); renderProbeCfg(); renderDxCfg(); renderWipLive(); }
 
 /* ---------- page tabs ---------- */
 function setPage(pg) {
@@ -1483,6 +1981,7 @@ function act(a) {
   const [k, x, y] = a.split(":");
   if (k === "power") {
     const n = N[x]; n.up = !n.up;
+    if (n.dns) { const z = DX.z[x]; z.gen++; z.busy = false; z.again = false; z.next = S.now + 5; if (DX.hp[x] && !DX.persist) { z.recs = null; z.serial = 0; z.bulk = 0; z.view = ""; z.count = 0; } DX.cs[x] = {}; }
     if (n.up) { n.big3d = true; if (n.dns) for (const i of INST) VIEW[x][i.key] = { st: "unknown", lastOk: S.now, why: "Checking", from: "", lastFail: "" }; log(x, "notice", "shell", "(lab) device powered on"); }
     else log(GTMS.find(g => g !== x && N[g].up) || x, "notice", "gtmd", `(lab) ${x} powered off`);
   } else if (k === "big3d") { const n = N[x]; n.big3d = !n.big3d; log(x, "notice", "bigstart", n.big3d ? "big3d started (bigstart start big3d)" : "big3d stopped (bigstart stop big3d)"); }
@@ -1501,7 +2000,17 @@ function act(a) {
   else if (k === "wan") { S.wan = !S.wan; log("gtm-nyc", "notice", "gtmd", `(lab) WAN link dc_nyc ↔ dc_sea ${S.wan ? "restored" : "down"}`); }
   else if (k === "viewas") { S.viewGtm = x; renderChrome(); renderTabs(); }
   else if (k === "flush") { for (const g of GTMS) PATHS[g][x] = {}; PENDING[x] = false; log("gtm-nyc", "notice", "tmsh", `delete gtm path ${N[x].ip}`); }
-  else if (k === "flushc") { CACHE[x] = { ns: 0, cname: {}, a: {} }; }
+  else if (k === "flushc") { CACHE[x] = freshCache(); log("bind", "notice", "named", `(lab) rndc flush on ${N[x].ip}`); }
+  else if (k === "dxx") { log(x, "notice", "zxfrd", "(lab) SOA check requested for zone chala.info"); zxfrStart(x, "manual check"); }
+  else if (k === "dxaxfr") { forceAxfr(x); }
+  else if (k === "dxhp") { dxSet("dxhp", x, y); }
+  else if (k === "dxcflush") { DX.cs[x] = {}; log(x, "notice", "tmsh", "delete ltm dns cache records rrset type all cache dns_cache_transparent"); }
+  else if (k === "mtu") { DX.mtu[x] = !DX.mtu[x]; log("gtm-" + x, "notice", "shell", DX.mtu[x] ? `(lab) path MTU blackhole between the DMZ and ${DC[x].name}` : `(lab) TCP MSS clamped on the DMZ ↔ ${DC[x].name} tunnel; large segments pass again`); }
+  else if (k === "zshop") publish(ZB.shop ? "removed shop.chala.info" : "added shop.chala.info A 203.0.113.81", () => { ZB.shop = !ZB.shop; });
+  else if (k === "zwww") { const to = ZB.www === "203.0.113.80" ? "203.0.113.85" : "203.0.113.80"; publish(`www.chala.info moved to ${to}`, () => { ZB.www = to; }); }
+  else if (k === "zbulk") publish(ZB.bulk ? "removed the inventory $INCLUDE" : `added $INCLUDE inventory.chala.info.db (${nfmt(BULK)} host records)`, () => { ZB.bulk = ZB.bulk ? 0 : BULK; });
+  else if (k === "zserial") publish("serial raised above every secondary", () => {}, Math.max(ZB.serial, ...GTMS.map(g => DX.z[g].serial)) + 1);
+  else if (k === "znsrc") { ZB.nsrc = ZB.nsrc === N.bind.ip ? "192.0.2.54" : N.bind.ip; log("bind", "notice", "named", `(lab) notify-source ${ZB.nsrc}; rndc reconfig`); }
   else if (k === "dnsq") { dnsQuery(x, y); }
   else if (k === "guide") { dnsQuery(x, y, true); }
   else if (k === "pmup" || k === "pmdn") { const p = POOLS[x], i = +y, j = k === "pmup" ? i - 1 : i + 1; [p.members[i], p.members[j]] = [p.members[j], p.members[i]]; reassignAll(); }
@@ -1526,8 +2035,32 @@ function act(a) {
   }
   render(); renderWip(); renderConsole();
 }
+function dxSet(k, x, val, on) {
+  const cmd = t => log("gtm-nyc", "notice", "mcpd", `(lab) ${t}`);
+  if (k === "dxon") {
+    DX.on = on;
+    if (on) GTMS.forEach((g, i) => { DX.z[g].next = S.now + 2 + i * 1.5; });
+    for (const l of LDNS) CACHE[l] = freshCache();
+    cmd(on ? "DNS Express enabled for chala.info; public NS records now point at the BIG-IP listeners (resolver caches flushed)" : "DNS Express disabled; internet resolvers query BIND again (resolver caches flushed)");
+  } else if (k === "dxzone") { DX.zoneEn = on; cmd(`modify ltm dns zone /Common/chala.info dns-express-enabled ${on ? "yes" : "no"}`); }
+  else if (k === "dxtsig") { DX.tsig = on; cmd(`modify ltm dns nameserver /Common/ns1_hidden tsig-key ${on ? "/Common/dnsx-ext" : "none"}`); }
+  else if (k === "dxallow") { DX.allow54 = on; cmd(`modify ltm dns zone /Common/chala.info dns-express-allow-notify ${on ? "replace-all-with { 192.0.2.54 }" : "none"}`); }
+  else if (k === "dxcache") { DX.cache = S.dxOpt.cache = on; if (!on) for (const g of GTMS) DX.cs[g] = {}; cmd(`modify ltm profile dns /Common/dns_express_gslb enable-cache ${on ? "yes cache /Common/dns_cache_transparent" : "no"}`); }
+  else if (k === "dxunh") { DX.unh = S.dxOpt.unh = val; cmd(`modify ltm profile dns /Common/dns_express_gslb unhandled-query-action ${val}`); }
+  else if (k === "dxpersist") { DX.persist = on; cmd(`modify sys db dnsexpress.persisthugepages value ${on}`); }
+  else if (k === "dxhp") {
+    const z = DX.z[x];
+    DX.hp[x] = +val;
+    log(x, "notice", "tmsh", `modify sys db dnsexpress.hugepages value ${val}; bigstart restart tmm`);
+    z.gen++; z.busy = false; z.again = false; DX.cs[x] = {};
+    if (!DX.persist) { z.recs = null; z.serial = 0; z.bulk = 0; z.view = ""; z.count = 0; }
+    z.next = S.now + 4;
+  }
+  render(); renderWip(); renderConsole(); renderScen();
+}
 function setv(spec, val, checked) {
   const [k, x, y] = spec.split(":");
+  if (k.startsWith("dx")) { dxSet(k, x, val, checked); return; }
   if (k === "dnson") { S.dnsOn = checked; return; }
   if (k === "newtype") { S.draft = { ...draftFor(val), name: S.draft.name, interval: S.draft.interval, timeout: S.draft.timeout }; renderMons(); return; }
   if (k === "msend" || k === "mrecv") {
@@ -1557,7 +2090,7 @@ function setv(spec, val, checked) {
   render(); renderWip(); renderConsole();
 }
 const DRAFT_FIELDS = { "nm-name": "name", "nm-send": "send", "nm-recv": "recv", "nm-interval": "interval", "nm-timeout": "timeout" };
-for (const box of [document.querySelector(".side"), $("#page-config")]) {
+for (const box of [document.querySelector(".side"), $("#page-config"), $("#scenText")]) {
   box.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b) act(b.dataset.act); });
   box.addEventListener("change", e => { const t = e.target; if (t.dataset.set) setv(t.dataset.set, t.value, t.checked); });
   box.addEventListener("input", e => { const f = DRAFT_FIELDS[e.target.id]; if (f) S.draft[f] = e.target.value; });
