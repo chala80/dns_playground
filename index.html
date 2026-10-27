@@ -181,7 +181,7 @@ code{font-family:var(--f-mono);font-size:12px}
     </div>
     <div class="transport">
       <span class="clock" id="clock">Oct 27 14:02:00</span>
-      <button class="primary" id="play" aria-pressed="true">Pause</button>
+      <button class="primary" id="play" aria-pressed="false">Start</button>
       <div class="seg" id="speed" role="group" aria-label="Simulation speed"></div>
       <button id="reset">Reset</button>
     </div>
@@ -272,7 +272,7 @@ const FB_OPTS = ["any", "inside", "outside", "none", "pool:pp_east", "pool:pp_we
 const COLOR = { up: "green", down: "red", unknown: "blue" };
 const DOTC = { up: "g", down: "r", unknown: "b" };
 
-let S = { speed: 1, playing: true, viewGtm: "gtm-nyc", sel: { k: "node", id: "gtm-nyc" }, tab: "log", show: { iq: true, result: true, probe: true, path: true, dns: true }, iqd: "gtm-sea>ltm-nyc", dnsOn: true, scen: "baseline" };
+let S = { speed: 1, playing: false, started: false, viewGtm: "gtm-nyc", sel: { k: "node", id: "gtm-nyc" }, tab: "log", show: { iq: true, result: true, probe: true, path: true, dns: true }, iqd: "gtm-sea>ltm-nyc", dnsOn: true, scen: "baseline" };
 let N, DC, POOLS, WIP, MEM, CONN, VIEW, PATHS, PENDING, TIMERS, LOGS, DNSLOG, PK, FL, RR;
 
 /* ---------- state ---------- */
@@ -634,7 +634,7 @@ function runScenario(k) {
   S.scen = k; fresh(); SCEN[k].setup();
   if (k !== "baseline") S.sel = { k: "node", id: k === "cert" ? "gtm-sea" : k === "noprober" ? "app-sea-01" : k === "wan" ? "gtm-nyc" : k === "rtt" ? "ldns-a" : "gtm-nyc" };
   log("gtm-nyc", "notice", "gtmd", `(lab) scenario started: ${SCEN[k].title}`);
-  S.playing = true;
+  S.playing = S.started = true;
   renderScen(); renderAll();
 }
 
@@ -957,7 +957,7 @@ function renderConsole() {
 /* ---------- chrome ---------- */
 function renderChrome() {
   $("#clock").textContent = ts(S.now);
-  $("#play").textContent = S.playing ? "Pause" : "Play";
+  $("#play").textContent = S.playing ? "Pause" : S.started ? "Play" : "Start";
   $("#play").setAttribute("aria-pressed", String(S.playing));
   $("#speed").innerHTML = SPEEDS.map(s => `<button data-speed="${s}" aria-pressed="${S.speed === s}">${s}×</button>`).join("");
   $("#viewAs").innerHTML = GTMS.map(g => `<button data-view="${g}" aria-pressed="${S.viewGtm === g}">${g}</button>`).join("");
@@ -975,7 +975,7 @@ function render() { renderSvg(); renderInspector(); renderPools(); renderWipLive
 function select(spec) { const [k, id] = spec.split(":"); S.sel = { k, id }; renderSvg(); renderInspector(); }
 $("#topo").addEventListener("click", e => { const t = e.target.closest("[data-sel]"); if (t) select(t.dataset.sel); });
 $("#topo").addEventListener("keydown", e => { if (e.key !== "Enter" && e.key !== " ") return; const t = e.target.closest("[data-sel]"); if (t) { e.preventDefault(); select(t.dataset.sel); } });
-$("#play").onclick = () => { S.playing = !S.playing; renderChrome(); };
+$("#play").onclick = () => { S.playing = !S.playing; S.started = true; renderChrome(); };
 $("#reset").onclick = () => runScenario(S.scen);
 $("#scenRun").onclick = () => runScenario($("#scenSel").value);
 $("#scenSel").onchange = e => { S.scen = e.target.value; renderScen(); };
